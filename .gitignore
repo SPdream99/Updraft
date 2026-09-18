@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller intermediate build files
+build/
+*.spec
+
+# Temporary update directories
+update-files/
+main/
+updater-info.ini
+update-done.bat
+
+# Environment & IDE
+.venv/
+env/
+.idea/
+.vscode/
+*.swp
