@@ -114,7 +114,12 @@ class TestDownloaderAndEngine(unittest.TestCase):
         self.assertTrue(is_executable("app.exe"))
         self.assertTrue(is_executable("run.bat"))
         self.assertTrue(is_executable("start.cmd"))
+        self.assertTrue(is_executable("script.ps1"))
+        self.assertTrue(is_executable("launcher.vbs"))
+        self.assertTrue(is_executable("worker.js"))
+        self.assertTrue(is_executable("job.wsf"))
         self.assertFalse(is_executable("data.json"))
+        self.assertFalse(is_executable("readme.md"))
 
     def test_archive_extraction_and_install_with_exclusions(self):
         # Create a mock zip archive

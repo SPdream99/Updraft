@@ -42,7 +42,7 @@ When launched for the first time in an unconfigured directory:
    - Downloads files into an `update-files/` directory.
    - Extracts archives directly into `main/` without creating redundant nested folders.
    - Cleans up `update-files/` and removes archives if option is enabled.
-   - Scans `main/` for `.exe`, `.bat`, `.cmd` and automatically creates `.lnk` shortcuts in the root project directory.
+   - Scans `main/` for executables and scripts (`.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.wsf`, `.js`, etc.) and automatically creates Windows `.lnk` shortcuts in the root project directory (with PowerShell execution bypass configured for `.ps1`).
 
 ---
 

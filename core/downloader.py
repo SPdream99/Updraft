@@ -15,29 +15,59 @@ def is_archive(filename: str) -> bool:
     return lower.endswith(".zip") or lower.endswith(".tar.gz") or lower.endswith(".tgz") or lower.endswith(".tar")
 
 
+EXECUTABLE_EXTENSIONS = {
+    ".exe",
+    ".bat",
+    ".cmd",
+    ".ps1",
+    ".vbs",
+    ".vbe",
+    ".js",
+    ".jse",
+    ".wsf",
+    ".wsh",
+    ".msc",
+}
+
+
 def is_executable(filename: str) -> bool:
-    lower = filename.lower()
-    return lower.endswith(".exe") or lower.endswith(".bat") or lower.endswith(".cmd") or lower.endswith(".ps1")
+    _, ext = os.path.splitext(filename)
+    return ext.lower() in EXECUTABLE_EXTENSIONS
 
 
 def create_windows_shortcut(target_path: str, shortcut_path: str, working_dir: Optional[str] = None):
     """
     Creates a Windows .lnk shortcut using WScript.Shell via PowerShell.
+    Special handling for .ps1 scripts ensures they execute with PowerShell rather than opening in a text editor.
     """
     if sys.platform != "win32":
         return
     if working_dir is None:
         working_dir = os.path.dirname(target_path)
     
-    target_path = os.path.abspath(target_path).replace("'", "''")
-    shortcut_path = os.path.abspath(shortcut_path).replace("'", "''")
-    working_dir = os.path.abspath(working_dir).replace("'", "''")
+    target_path = os.path.abspath(target_path)
+    shortcut_path = os.path.abspath(shortcut_path)
+    working_dir = os.path.abspath(working_dir)
+
+    ext = os.path.splitext(target_path)[1].lower()
+    if ext == ".ps1":
+        target_exe = "powershell.exe"
+        arguments = f'-NoProfile -ExecutionPolicy Bypass -File "{target_path}"'
+    else:
+        target_exe = target_path
+        arguments = ""
+
+    target_exe_esc = target_exe.replace("'", "''")
+    shortcut_path_esc = shortcut_path.replace("'", "''")
+    working_dir_esc = working_dir.replace("'", "''")
+    arguments_esc = arguments.replace("'", "''")
 
     ps_script = (
         f"$ws = New-Object -ComObject WScript.Shell; "
-        f"$s = $ws.CreateShortcut('{shortcut_path}'); "
-        f"$s.TargetPath = '{target_path}'; "
-        f"$s.WorkingDirectory = '{working_dir}'; "
+        f"$s = $ws.CreateShortcut('{shortcut_path_esc}'); "
+        f"$s.TargetPath = '{target_exe_esc}'; "
+        f"$s.Arguments = '{arguments_esc}'; "
+        f"$s.WorkingDirectory = '{working_dir_esc}'; "
         f"$s.Save();"
     )
 
@@ -226,7 +256,7 @@ class UpdateEngine:
     def create_shortcuts(self):
         """
         Creates Windows shortcuts (.lnk) in the project directory for any
-        .exe, .bat, or .cmd found inside the main folder.
+        executables or scripts (.exe, .bat, .cmd, .ps1, .vbs, etc.) found inside main/.
         """
         if not os.path.exists(self.main_dir):
             return
@@ -235,9 +265,15 @@ class UpdateEngine:
             for file in files:
                 if is_executable(file):
                     target_file = os.path.join(root, file)
-                    base_name, _ = os.path.splitext(file)
+                    base_name, ext = os.path.splitext(file)
                     shortcut_name = f"{base_name}.lnk"
                     shortcut_path = os.path.join(self.project_dir, shortcut_name)
+
+                    # If multiple files share the same base name, prevent overwrite by appending extension
+                    if os.path.exists(shortcut_path):
+                        shortcut_name = f"{base_name} ({ext.lstrip('.')}).lnk"
+                        shortcut_path = os.path.join(self.project_dir, shortcut_name)
+
                     create_windows_shortcut(target_file, shortcut_path, working_dir=os.path.dirname(target_file))
 
     def open_main_folder(self):
