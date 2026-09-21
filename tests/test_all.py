@@ -211,5 +211,65 @@ class TestManagedRegistry(unittest.TestCase):
         self.assertFalse(self.registry.has_instance(proj_dir))
 
 
+class TestAssetMatcher(unittest.TestCase):
+    def test_exact_match(self):
+        from core.asset_matcher import match_release_assets
+        available = [
+            {"name": "setup.exe", "download_url": "http://example.com/setup.exe"},
+            {"name": "setup.zip", "download_url": "http://example.com/setup.zip"}
+        ]
+        matched, unresolved = match_release_assets(["setup.exe"], available)
+        self.assertEqual(len(matched), 1)
+        self.assertEqual(matched[0]["name"], "setup.exe")
+        self.assertEqual(unresolved, [])
+
+    def test_tag_replacement(self):
+        from core.asset_matcher import match_release_assets
+        available = [
+            {"name": "scrcpy-win64-v4.2.zip", "download_url": "http://example.com/win64.zip"},
+            {"name": "scrcpy-linux-v4.2.tar.gz", "download_url": "http://example.com/linux.tar.gz"}
+        ]
+        # Previous version was v4.1, new version is v4.2
+        matched, unresolved = match_release_assets(
+            ["scrcpy-win64-v4.1.zip"],
+            available,
+            old_tag="v4.1",
+            new_tag="v4.2"
+        )
+        self.assertEqual(len(matched), 1)
+        self.assertEqual(matched[0]["name"], "scrcpy-win64-v4.2.zip")
+        self.assertEqual(unresolved, [])
+
+    def test_regex_version_masking(self):
+        from core.asset_matcher import match_release_assets
+        available = [
+            {"name": "mytool-2.5.1-x86_64.zip", "download_url": "http://example.com/win.zip"},
+            {"name": "mytool-2.5.1-arm64.tar.gz", "download_url": "http://example.com/arm.tar.gz"}
+        ]
+        # Without tags provided, regex masks 1.0.0 and matches 2.5.1
+        matched, unresolved = match_release_assets(
+            ["mytool-1.0.0-x86_64.zip"],
+            available
+        )
+        self.assertEqual(len(matched), 1)
+        self.assertEqual(matched[0]["name"], "mytool-2.5.1-x86_64.zip")
+        self.assertEqual(unresolved, [])
+
+    def test_unresolved_renamed_detection(self):
+        from core.asset_matcher import match_release_assets
+        available = [
+            {"name": "completely-renamed-package.zip", "download_url": "http://example.com/pkg.zip"}
+        ]
+        # Target has no resemblance or version match
+        matched, unresolved = match_release_assets(
+            ["old-software-win64.zip"],
+            available,
+            old_tag="v1.0",
+            new_tag="v2.0"
+        )
+        self.assertEqual(len(matched), 0)
+        self.assertEqual(unresolved, ["old-software-win64.zip"])
+
+
 if __name__ == "__main__":
     unittest.main()

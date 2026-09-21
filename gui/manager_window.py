@@ -22,6 +22,8 @@ from core.theme import (
     SUCCESS_GREEN,
     ACCENT_BLUE,
 )
+from core.asset_matcher import match_release_assets
+from gui.asset_picker_dialog import AssetPickerDialog
 from gui.exclude_window import ExcludeFilesDialog
 from gui.settings_window import SettingsDialog
 
@@ -343,11 +345,19 @@ class UpdateManagerWindow(tk.Tk):
             if rel:
                 remote_name = rel.get("name") or rel.get("tag_name")
                 remote_date = rel.get("published_at", "")
+                remote_tag = rel.get("tag_name", "")
+                all_assets = rel.get("assets", [])
+                unresolved = []
+                matched_assets = []
                 if (remote_name != config.version_name) or (remote_date > config.version_date):
                     is_available = True
-                    for a in rel.get("assets", []):
-                        if not config.selected_assets or a["name"] in config.selected_assets:
-                            download_urls.append((a["download_url"], a["name"]))
+                    matched_assets, unresolved = match_release_assets(
+                        selected_asset_names=config.selected_assets,
+                        available_assets=all_assets,
+                        old_tag=config.version_name,
+                        new_tag=remote_tag or remote_name
+                    )
+                    download_urls = [(a["download_url"], a["name"]) for a in matched_assets]
 
         return {
             "checked": True,
@@ -355,6 +365,9 @@ class UpdateManagerWindow(tk.Tk):
             "latest_version": remote_name,
             "latest_date": remote_date,
             "download_urls": download_urls,
+            "all_assets": all_assets if config.update_type == "release" else [],
+            "matched_assets": matched_assets if config.update_type == "release" else [],
+            "unresolved": unresolved if config.update_type == "release" else [],
             "config": config,
         }
 
@@ -421,6 +434,33 @@ class UpdateManagerWindow(tk.Tk):
         )
         if not confirm:
             return
+
+        # If release update has unresolved assets or no matches found while assets exist:
+        if rem["config"].update_type == "release" and rem.get("all_assets"):
+            if rem.get("unresolved") or not rem.get("download_urls"):
+                def on_assets_chosen(chosen_names: List[str]):
+                    config = rem["config"]
+                    config.selected_assets = chosen_names
+                    config.save()
+                    rem["download_urls"] = [(a["download_url"], a["name"]) for a in rem["all_assets"] if a["name"] in chosen_names]
+                    self._perform_update_for_path(path, rem)
+
+                preselected = [a["name"] for a in rem.get("matched_assets", [])]
+                AssetPickerDialog(
+                    self,
+                    project_name=rem["config"].project_name,
+                    release_tag=rem["latest_version"],
+                    available_assets=rem["all_assets"],
+                    preselected_names=preselected,
+                    unresolved_names=rem.get("unresolved", []),
+                    on_confirm=on_assets_chosen
+                )
+                return
+            else:
+                # Update selected_assets in config to new matched asset names
+                config = rem["config"]
+                config.selected_assets = [a["name"] for a in rem.get("matched_assets", [])]
+                config.save()
 
         self._perform_update_for_path(path, rem)
 

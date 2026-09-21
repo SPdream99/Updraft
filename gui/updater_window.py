@@ -22,6 +22,8 @@ from core.theme import (
     SUCCESS_GREEN,
     ACCENT_BLUE,
 )
+from core.asset_matcher import match_release_assets
+from gui.asset_picker_dialog import AssetPickerDialog
 from gui.exclude_window import ExcludeFilesDialog
 from gui.settings_window import SettingsDialog
 
@@ -207,19 +209,27 @@ class UpdaterMainWindow(tk.Tk):
                     if latest_release:
                         remote_version_name = latest_release.get("name") or latest_release.get("tag_name")
                         remote_version_date = latest_release.get("published_at", "")
+                        remote_tag = latest_release.get("tag_name", "")
+                        all_assets = latest_release.get("assets", [])
                         
                         if (remote_version_name != self.config.version_name) or (remote_version_date > self.config.version_date):
                             is_update_available = True
-                            selected_assets = self.config.selected_assets
-                            for a in latest_release.get("assets", []):
-                                if not selected_assets or a["name"] in selected_assets:
-                                    remote_download_urls.append((a["download_url"], a["name"]))
+                            matched_assets, unresolved = match_release_assets(
+                                selected_asset_names=self.config.selected_assets,
+                                available_assets=all_assets,
+                                old_tag=self.config.version_name,
+                                new_tag=remote_tag or remote_version_name
+                            )
+                            remote_download_urls = [(a["download_url"], a["name"]) for a in matched_assets]
 
                 if is_update_available:
                     self.after(0, lambda: self._prompt_and_perform_update(
                         remote_version_name,
                         remote_version_date,
-                        remote_download_urls
+                        remote_download_urls,
+                        all_assets=all_assets if self.config.update_type == "release" else None,
+                        unresolved=unresolved if self.config.update_type == "release" else None,
+                        matched_assets=matched_assets if self.config.update_type == "release" else None
                     ))
                 else:
                     self.after(0, lambda: self._show_up_to_date(self.config.version_name))
@@ -247,7 +257,10 @@ class UpdaterMainWindow(tk.Tk):
         self,
         new_version_name: str,
         new_version_date: str,
-        download_urls: List[tuple]
+        download_urls: List[tuple],
+        all_assets: Optional[List[Dict[str, Any]]] = None,
+        unresolved: Optional[List[str]] = None,
+        matched_assets: Optional[List[Dict[str, Any]]] = None
     ):
         self.lbl_status.config(text="Update available!", foreground=ACCENT_BLUE)
 
@@ -264,6 +277,39 @@ class UpdaterMainWindow(tk.Tk):
             self.lbl_status.config(text="Update cancelled by user.", foreground=MUTED_TEXT)
             return
 
+        # If release update has unresolved assets or no matches found while assets exist:
+        if self.config.update_type == "release" and all_assets:
+            if unresolved or not download_urls:
+                def on_assets_chosen(chosen_names: List[str]):
+                    self.config.selected_assets = chosen_names
+                    self.config.save()
+                    chosen_urls = [(a["download_url"], a["name"]) for a in all_assets if a["name"] in chosen_names]
+                    self._start_download_and_install(new_version_name, new_version_date, chosen_urls)
+
+                preselected = [a["name"] for a in (matched_assets or [])]
+                AssetPickerDialog(
+                    self,
+                    project_name=self.config.project_name,
+                    release_tag=new_version_name,
+                    available_assets=all_assets,
+                    preselected_names=preselected,
+                    unresolved_names=unresolved,
+                    on_confirm=on_assets_chosen
+                )
+                return
+            else:
+                # Automatically update config.selected_assets with matched new asset names
+                self.config.selected_assets = [a["name"] for a in (matched_assets or [])]
+                self.config.save()
+
+        self._start_download_and_install(new_version_name, new_version_date, download_urls)
+
+    def _start_download_and_install(
+        self,
+        new_version_name: str,
+        new_version_date: str,
+        download_urls: List[tuple]
+    ):
         # Disable buttons during update
         self._set_buttons_state("disabled")
         self.lbl_status.config(text="Starting update...")
