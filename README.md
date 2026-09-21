@@ -24,15 +24,20 @@ Updraft ships as three separate executables:
 
 ## Getting started
 
-**First run — Install phase**
+### First run — Install phase
 
 When launched in a folder without an existing configuration, the updater opens a setup wizard:
 
-1. Enter a GitHub repository URL (`https://github.com/owner/repo` or just `owner/repo`).
+1. Enter a GitHub repository URL (`https://github.com/owner/repo` or shorthand `owner/repo`).
 2. Choose an update source:
    - **Release Page** — select one or more release asset files to download.
    - **Source Code** — download the latest commit as a zip archive.
-3. Set completion options (open folder when done, delete archives, run a script on completion).
+3. Set completion options (open folder when done, delete archives, run script on completion).
+
+<p align="center">
+  <img src="docs/images/install_wizard_step1.png" alt="Setup Wizard - Repository URL" width="48%">
+  <img src="docs/images/install_wizard_step2.png" alt="Setup Wizard - Asset Selection" width="48%">
+</p>
 
 The updater then:
 - Creates a project folder named after the repository.
@@ -41,14 +46,48 @@ The updater then:
 - Creates Windows shortcuts (`.lnk`) for all executables and scripts found in `main/`.
 - Saves configuration to `updater-info.ini`.
 
-**Subsequent runs — Update phase**
+---
 
-The updater opens directly to the dashboard and shows the current version. From here:
+### Subsequent runs — Update phase
+
+The updater opens directly to the dashboard and displays the current version.
+
+<p align="center">
+  <img src="docs/images/updater_main.png" alt="Main Updater Dashboard" width="55%">
+</p>
+
+From here:
 
 - **Check for Update** — queries GitHub for a newer release or commit. Shows a comparison before downloading. Preserves excluded files.
 - **Exclude-File** — browse files in `main/` and mark any file to be skipped during updates. Excluded files can also be updated individually.
 - **Setting** — toggle post-download options.
 - **Run bat script** — execute `update-done.bat` in a visible terminal, starting in `main/`.
+
+---
+
+### File exclusion manager
+
+Protect local configurations, save files, or custom scripts from being overwritten during updates.
+
+<p align="center">
+  <img src="docs/images/exclude_files.png" alt="File Exclusion Manager" width="75%">
+</p>
+
+- Left pane: Explorer tree with checkboxes for files and folders in `main/`.
+- Right pane: Version metadata for selected files, with an **Update This File** button enabled whenever an excluded file is older than the current project release.
+
+---
+
+### Central Update Manager
+
+Monitor, check, and update all managed Git installations across your PC from one central window.
+
+<p align="center">
+  <img src="docs/images/update_manager.png" alt="Update Manager Dashboard" width="85%">
+</p>
+
+- Supports one-click **Check All Updates** and **Update All**.
+- Per-project actions: Check, Update, Exclude Files, Settings, Run Script, or Open Folder.
 
 ---
 
