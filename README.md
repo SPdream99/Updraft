@@ -1,4 +1,4 @@
-# Updraft
+# Updraft - Git Project Updater Control
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Build](https://github.com/SPdream99/updraft/actions/workflows/build.yml/badge.svg)](https://github.com/SPdream99/updraft/actions/workflows/build.yml)
