@@ -6,10 +6,8 @@ __pycache__/
 
 # PyInstaller intermediate build artifacts
 build/
+dist/
 *.spec
-
-# Distribution binaries (tracked separately or downloaded from releases)
-# dist/       <- intentionally NOT excluded so binaries are included in repo
 
 # Updraft runtime files (generated per install)
 update-files/
