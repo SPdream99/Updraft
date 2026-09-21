@@ -32,8 +32,8 @@ class UpdateManagerWindow(tk.Tk):
         self.registry = ManagedRegistry()
 
         self.title("Update Manager")
-        self.geometry("900x560")
-        self.minsize(780, 480)
+        self.geometry("940x600")
+        self.minsize(820, 500)
 
         apply_win7_theme(self)
 
@@ -81,9 +81,50 @@ class UpdateManagerWindow(tk.Tk):
         sep_top = tk.Frame(self, height=1, bg=LIGHT_BORDER)
         sep_top.pack(fill="x")
 
-        # Main Content: TreeView Table of Projects
+        # Bottom Status Bar (docked first to bottom)
+        status_bar = ttk.Frame(self, padding=(14, 4))
+        status_bar.pack(fill="x", side="bottom")
+
+        sep_bot = tk.Frame(self, height=1, bg=LIGHT_BORDER)
+        sep_bot.pack(fill="x", side="bottom")
+
+        self.lbl_status = ttk.Label(status_bar, text="Ready", font=("Segoe UI", 8), foreground=MUTED_TEXT)
+        self.lbl_status.pack(side="left")
+
+        self.lbl_count = ttk.Label(status_bar, text="0 instances managed", font=("Segoe UI", 8), foreground=MUTED_TEXT)
+        self.lbl_count.pack(side="right")
+
+        # Selected Project Actions Panel (docked right above status bar)
+        action_box = ttk.LabelFrame(self, text="Selected Project Actions", padding=(12, 8))
+        action_box.pack(fill="x", padx=14, pady=(4, 8), side="bottom")
+
+        btn_box = ttk.Frame(action_box)
+        btn_box.pack(fill="x")
+
+        self.btn_check_sel = ttk.Button(btn_box, text="Check Update", command=self._on_check_selected, state="disabled")
+        self.btn_check_sel.pack(side="left", padx=(0, 6))
+
+        self.btn_update_sel = ttk.Button(btn_box, text="Update Project", style="Accent.TButton", command=self._on_update_selected, state="disabled")
+        self.btn_update_sel.pack(side="left", padx=(0, 6))
+
+        self.btn_exclude_sel = ttk.Button(btn_box, text="Exclude Files...", command=self._on_exclude_selected, state="disabled")
+        self.btn_exclude_sel.pack(side="left", padx=(0, 6))
+
+        self.btn_settings_sel = ttk.Button(btn_box, text="Settings...", command=self._on_settings_selected, state="disabled")
+        self.btn_settings_sel.pack(side="left", padx=(0, 6))
+
+        self.btn_run_script_sel = ttk.Button(btn_box, text="Run Bat Script", command=self._on_run_script_selected, state="disabled")
+        self.btn_run_script_sel.pack(side="left", padx=(0, 6))
+
+        self.btn_open_folder = ttk.Button(btn_box, text="Open Folder", command=self._on_open_folder, state="disabled")
+        self.btn_open_folder.pack(side="left", padx=(0, 6))
+
+        self.btn_remove_sel = ttk.Button(btn_box, text="Remove from List", command=self._on_remove_selected, state="disabled")
+        self.btn_remove_sel.pack(side="right")
+
+        # Main Content: TreeView Table of Projects (takes all remaining space)
         content_frame = ttk.Frame(self, padding=(14, 10))
-        content_frame.pack(fill="both", expand=True)
+        content_frame.pack(fill="both", expand=True, side="top")
 
         scroll_y = ttk.Scrollbar(content_frame, orient="vertical")
         scroll_x = ttk.Scrollbar(content_frame, orient="horizontal")
@@ -121,47 +162,6 @@ class UpdateManagerWindow(tk.Tk):
 
         self.tree.bind("<<TreeviewSelect>>", self._on_select_item)
         self.tree.bind("<Double-1>", lambda e: self._on_open_folder())
-
-        # Selected Project Actions Panel
-        action_box = ttk.LabelFrame(self, text="Selected Project Actions", padding=(12, 8))
-        action_box.pack(fill="x", padx=14, pady=(0, 10))
-
-        btn_box = ttk.Frame(action_box)
-        btn_box.pack(fill="x")
-
-        self.btn_check_sel = ttk.Button(btn_box, text="Check Update", command=self._on_check_selected, state="disabled")
-        self.btn_check_sel.pack(side="left", padx=(0, 6))
-
-        self.btn_update_sel = ttk.Button(btn_box, text="Update Project", style="Accent.TButton", command=self._on_update_selected, state="disabled")
-        self.btn_update_sel.pack(side="left", padx=(0, 6))
-
-        self.btn_exclude_sel = ttk.Button(btn_box, text="Exclude Files...", command=self._on_exclude_selected, state="disabled")
-        self.btn_exclude_sel.pack(side="left", padx=(0, 6))
-
-        self.btn_settings_sel = ttk.Button(btn_box, text="Settings...", command=self._on_settings_selected, state="disabled")
-        self.btn_settings_sel.pack(side="left", padx=(0, 6))
-
-        self.btn_run_script_sel = ttk.Button(btn_box, text="Run Bat Script", command=self._on_run_script_selected, state="disabled")
-        self.btn_run_script_sel.pack(side="left", padx=(0, 6))
-
-        self.btn_open_folder = ttk.Button(btn_box, text="Open Folder", command=self._on_open_folder, state="disabled")
-        self.btn_open_folder.pack(side="left", padx=(0, 6))
-
-        self.btn_remove_sel = ttk.Button(btn_box, text="Remove from List", command=self._on_remove_selected, state="disabled")
-        self.btn_remove_sel.pack(side="right")
-
-        # Bottom Status Bar
-        status_bar = ttk.Frame(self, padding=(14, 4))
-        status_bar.pack(fill="x", side="bottom")
-
-        sep_bot = tk.Frame(self, height=1, bg=LIGHT_BORDER)
-        sep_bot.pack(fill="x", side="bottom")
-
-        self.lbl_status = ttk.Label(status_bar, text="Ready", font=("Segoe UI", 8), foreground=MUTED_TEXT)
-        self.lbl_status.pack(side="left")
-
-        self.lbl_count = ttk.Label(status_bar, text="0 instances managed", font=("Segoe UI", 8), foreground=MUTED_TEXT)
-        self.lbl_count.pack(side="right")
 
     def _refresh_list(self):
         self.registry.load()

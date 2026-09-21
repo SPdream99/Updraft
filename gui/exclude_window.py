@@ -37,8 +37,8 @@ class ExcludeFilesDialog(tk.Toplevel):
         self.engine = UpdateEngine(self.project_dir)
 
         self.title(f"Exclude Files from Updates - {config.project_name or 'Simple Updater'}")
-        self.geometry("780x520")
-        self.minsize(650, 420)
+        self.geometry("820x560")
+        self.minsize(700, 480)
         self.transient(parent)
         self.grab_set()
 
@@ -61,6 +61,19 @@ class ExcludeFilesDialog(tk.Toplevel):
             "Exclude Files from Updates",
             "Checked files will not be replaced during automatic project updates"
         )
+
+        # Bottom buttons bar (docked first to bottom so it is NEVER hidden)
+        bottom_frame = ttk.Frame(self, padding=(16, 10))
+        bottom_frame.pack(fill="x", side="bottom")
+
+        sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
+        sep.pack(fill="x", side="bottom")
+
+        btn_close = ttk.Button(bottom_frame, text="Close", width=12, command=self.destroy)
+        btn_close.pack(side="right", padx=(8, 0))
+
+        btn_save = ttk.Button(bottom_frame, text="Save and Close", width=14, command=self._save_and_close)
+        btn_save.pack(side="right")
 
         # Paned Window (Left: File Explorer Tree; Right: File Details)
         paned = ttk.PanedWindow(self, orient="horizontal")
@@ -140,19 +153,6 @@ class ExcludeFilesDialog(tk.Toplevel):
             wraplength=220
         )
         self.lbl_update_hint.pack(anchor="w", pady=(2, 0))
-
-        # Bottom buttons bar
-        bottom_frame = ttk.Frame(self, padding=(16, 10))
-        bottom_frame.pack(fill="x", side="bottom")
-
-        sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
-        sep.pack(fill="x", side="bottom")
-
-        btn_close = ttk.Button(bottom_frame, text="Close", width=12, command=self.destroy)
-        btn_close.pack(side="right", padx=(8, 0))
-
-        btn_save = ttk.Button(bottom_frame, text="Save and Close", width=14, command=self._save_and_close)
-        btn_save.pack(side="right")
 
     def _populate_tree(self):
         for item in self.tree.get_children():

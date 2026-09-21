@@ -40,8 +40,8 @@ class InstallWizard(tk.Tk):
 
         mode_label = "Managed Updater" if is_managed else "Simple Updater"
         self.title(f"{mode_label} - Setup & Installation Wizard")
-        self.geometry("640x520")
-        self.minsize(580, 460)
+        self.geometry("680x580")
+        self.minsize(600, 500)
 
         apply_win7_theme(self)
 
@@ -80,16 +80,16 @@ class InstallWizard(tk.Tk):
             "Set up automatic updates from a Git or GitHub repository"
         )
 
-        # Main container for steps
-        self.container = ttk.Frame(self, padding=(24, 16))
-        self.container.pack(fill="both", expand=True)
+        # Bottom navigation bar (packed side="bottom" FIRST so it is NEVER hidden)
+        self.bottom_bar = ttk.Frame(self, padding=(20, 12))
+        self.bottom_bar.pack(fill="x", side="bottom")
 
-        # Bottom navigation bar
         sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
         sep.pack(fill="x", side="bottom")
 
-        self.bottom_bar = ttk.Frame(self, padding=(20, 12))
-        self.bottom_bar.pack(fill="x", side="bottom")
+        # Main container for steps (fills remaining space in the middle)
+        self.container = ttk.Frame(self, padding=(24, 16))
+        self.container.pack(fill="both", expand=True, side="top")
 
         self.btn_cancel = ttk.Button(self.bottom_bar, text="Cancel", width=12, command=self.destroy)
         self.btn_cancel.pack(side="right", padx=(8, 0))
@@ -237,9 +237,23 @@ class InstallWizard(tk.Tk):
         scrollbar = ttk.Scrollbar(self.asset_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style="White.TFrame", padding=6)
 
-        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        def _on_frame_configure(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        scrollable_frame.bind("<Configure>", _on_frame_configure)
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+
+        def _on_canvas_configure(e):
+            canvas.itemconfig(canvas_window, width=e.width)
+
+        canvas.bind("<Configure>", _on_canvas_configure)
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        def _on_mousewheel(e):
+            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
+        canvas.bind("<Enter>", lambda _: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda _: canvas.unbind_all("<MouseWheel>"))
 
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)

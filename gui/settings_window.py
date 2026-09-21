@@ -27,7 +27,8 @@ class SettingsDialog(tk.Toplevel):
 
         title_text = "Global Updater Settings" if is_global else f"Settings - {config.project_name or 'Simple Updater'}"
         self.title(title_text)
-        self.geometry("460x320")
+        self.geometry("480x350")
+        self.minsize(440, 320)
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -49,8 +50,21 @@ class SettingsDialog(tk.Toplevel):
         sub = "Configure global defaults for all managed projects" if self.is_global else "Configure actions performed after updating or installing"
         create_win7_header(self, "Updater Settings", sub)
 
+        # Bottom buttons bar (docked first so it is never hidden)
+        bottom_frame = ttk.Frame(self, padding=(16, 12))
+        bottom_frame.pack(fill="x", side="bottom")
+
+        sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
+        sep.pack(fill="x", side="bottom")
+
+        btn_close = ttk.Button(bottom_frame, text="Close", width=12, command=self.destroy)
+        btn_close.pack(side="right", padx=(8, 0))
+
+        btn_save = ttk.Button(bottom_frame, text="Save and Close", width=14, command=self._save_and_close)
+        btn_save.pack(side="right")
+
         body_frame = ttk.Frame(self, padding=(20, 16))
-        body_frame.pack(fill="both", expand=True)
+        body_frame.pack(fill="both", expand=True, side="top")
 
         group = ttk.LabelFrame(body_frame, text="Completion Options", padding=(15, 12))
         group.pack(fill="both", expand=True)
@@ -78,19 +92,6 @@ class SettingsDialog(tk.Toplevel):
             variable=self.var_run_script
         )
         self.chk_run_script.pack(anchor="w", pady=(4, 4))
-
-        # Bottom buttons bar
-        bottom_frame = ttk.Frame(self, padding=(16, 12))
-        bottom_frame.pack(fill="x", side="bottom")
-
-        sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
-        sep.pack(fill="x", side="bottom")
-
-        btn_close = ttk.Button(bottom_frame, text="Close", width=12, command=self.destroy)
-        btn_close.pack(side="right", padx=(8, 0))
-
-        btn_save = ttk.Button(bottom_frame, text="Save and Close", width=14, command=self._save_and_close)
-        btn_save.pack(side="right")
 
     def _save_and_close(self):
         self.config.open_when_done = self.var_open.get()

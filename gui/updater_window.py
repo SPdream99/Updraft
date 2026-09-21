@@ -50,8 +50,8 @@ class UpdaterMainWindow(tk.Tk):
         proj_title = self.config.project_name or os.path.basename(self.project_dir)
         mode_str = "Managed" if self.is_managed else "Standalone"
         self.title(f"{proj_title} - Updater ({mode_str})")
-        self.geometry("520x510")
-        self.minsize(480, 470)
+        self.geometry("540x530")
+        self.minsize(500, 490)
         self.resizable(False, False)
 
         apply_win7_theme(self)
@@ -75,8 +75,22 @@ class UpdaterMainWindow(tk.Tk):
             "Keep your project files, executables, and dependencies up to date"
         )
 
+        # Progress bar & Status text area docked at bottom FIRST
+        status_frame = ttk.Frame(self, padding=(20, 8))
+        status_frame.pack(fill="x", side="bottom")
+
+        sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
+        sep.pack(fill="x", side="bottom")
+
+        self.progress_bar = ttk.Progressbar(status_frame, mode="determinate")
+        self.progress_bar.pack(fill="x", pady=(0, 4))
+
+        self.lbl_status = ttk.Label(status_frame, text="Ready", font=("Segoe UI", 8), foreground=MUTED_TEXT)
+        self.lbl_status.pack(anchor="w")
+
+        # Main content area
         main_frame = ttk.Frame(self, padding=(24, 16))
-        main_frame.pack(fill="both", expand=True)
+        main_frame.pack(fill="both", expand=True, side="top")
 
         # Status & Version Information Box
         info_group = ttk.LabelFrame(main_frame, text="Current Project Details", padding=(16, 12))
@@ -150,19 +164,6 @@ class UpdaterMainWindow(tk.Tk):
             command=self.destroy
         )
         self.btn_close.pack(fill="x", pady=4, ipady=3)
-
-        # Progress bar & Status text area at bottom
-        status_frame = ttk.Frame(self, padding=(20, 8))
-        status_frame.pack(fill="x", side="bottom")
-
-        sep = tk.Frame(self, height=1, bg=LIGHT_BORDER)
-        sep.pack(fill="x", side="bottom")
-
-        self.progress_bar = ttk.Progressbar(status_frame, mode="determinate")
-        self.progress_bar.pack(fill="x", pady=(0, 4))
-
-        self.lbl_status = ttk.Label(status_frame, text="Ready", font=("Segoe UI", 8), foreground=MUTED_TEXT)
-        self.lbl_status.pack(anchor="w")
 
     def _refresh_info_labels(self):
         self.config.load()
