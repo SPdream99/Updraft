@@ -127,6 +127,7 @@ python -m unittest discover -s tests
 
 ## Notes
 
+- Antigravity contributed to the development of this app.
 - The `update-done.bat` file is created blank on first install. Edit it to run any post-update commands (rebuild steps, restart scripts, etc.).
 - The `main/` folder and `updater-info.ini` are excluded from version control by default. Do not delete `updater-info.ini` unless you want to re-run the setup wizard.
 - Shortcuts are created in the project root folder for each `.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.wsf`, and `.js` file found in `main/`. PowerShell shortcuts include an execution policy bypass.
