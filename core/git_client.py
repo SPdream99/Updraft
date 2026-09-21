@@ -57,8 +57,16 @@ class GitHubClient:
         self.repo_info = repo_info
         self.base_api = f"https://api.github.com/repos/{self.repo_info.owner}/{self.repo_info.repo}"
 
-    def _api_get(self, endpoint: str) -> Any:
-        url = f"{self.base_api}{endpoint}" if endpoint.startswith("/") else endpoint
+    def _api_get(self, endpoint: str = "") -> Any:
+        if endpoint.startswith("http://") or endpoint.startswith("https://"):
+            url = endpoint
+        elif endpoint.startswith("/"):
+            url = f"{self.base_api}{endpoint}"
+        elif endpoint:
+            url = f"{self.base_api}/{endpoint}"
+        else:
+            url = self.base_api
+
         req = urllib.request.Request(url, headers={
             "User-Agent": USER_AGENT,
             "Accept": "application/vnd.github.v3+json"

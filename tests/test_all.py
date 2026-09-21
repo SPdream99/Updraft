@@ -11,7 +11,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from core.config import UpdaterConfig, ManagedRegistry
-from core.git_client import parse_git_url, GitRepoInfo
+from core.git_client import parse_git_url, GitRepoInfo, GitHubClient
 from core.downloader import UpdateEngine, is_archive, is_executable
 
 
@@ -95,6 +95,13 @@ class TestGitParser(unittest.TestCase):
             self.assertIsNotNone(res, f"Failed to parse {url}")
             self.assertEqual(res.owner, exp_owner)
             self.assertEqual(res.repo, exp_repo)
+
+    def test_github_client_repo_details(self):
+        info = parse_git_url("https://github.com/Genymobile/scrcpy")
+        client = GitHubClient(info)
+        details = client.get_repo_details()
+        self.assertEqual(details["name"].lower(), "scrcpy")
+        self.assertIn("scrcpy", details["html_url"].lower())
 
 
 class TestDownloaderAndEngine(unittest.TestCase):
