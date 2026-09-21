@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install requests pyinstaller pywin32
+
+      - name: Build executables
+        run: python build.py
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/SimpleUpdater.exe
+            dist/ManagedUpdater.exe
+            dist/UpdateManager.exe
+          body: |
+            Built automatically from source on tag ${{ github.ref_name }}.
+
+            | File | Description |
+            |------|-------------|
+            | SimpleUpdater.exe | Standalone updater — drop into any project folder |
+            | ManagedUpdater.exe | Managed updater — tracked by UpdateManager |
+            | UpdateManager.exe | Central dashboard for all managed projects |

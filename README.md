@@ -1,8 +1,14 @@
 # Updraft
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build](https://github.com/SPdream99/updraft/actions/workflows/build.yml/badge.svg)](https://github.com/SPdream99/updraft/actions/workflows/build.yml)
+[![Releases](https://img.shields.io/github/v/release/SPdream99/updraft)](https://github.com/SPdream99/updraft/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](https://github.com/SPdream99/updraft/releases)
+
 A standalone updater suite for any GitHub project. Drop it in any folder, point it at a repository, and it handles downloading, extracting, and keeping your project up to date — automatically.
 
 ---
+
 
 ## What it does
 
