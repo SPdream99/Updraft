@@ -1,21 +1,35 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
 
-# PyInstaller intermediate build files
+# PyInstaller intermediate build artifacts
 build/
 *.spec
 
-# Temporary update directories
+# Distribution binaries (tracked separately or downloaded from releases)
+# dist/       <- intentionally NOT excluded so binaries are included in repo
+
+# Updraft runtime files (generated per install)
 update-files/
 main/
 updater-info.ini
 update-done.bat
 
-# Environment & IDE
+# Virtual environments
 .venv/
 env/
+venv/
+.env
+
+# IDE and editor files
 .idea/
 .vscode/
 *.swp
+*.swo
+*~
+
+# Windows
+Thumbs.db
+desktop.ini
