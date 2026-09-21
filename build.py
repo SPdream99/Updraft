@@ -38,6 +38,9 @@ def build_all():
         entry = app["entry"]
         print(f"\n---> Building {name}.exe from {entry}...")
 
+        icon_path = os.path.join(BASE_DIR, "assets", "icon.ico")
+        assets_dir = os.path.join(BASE_DIR, "assets")
+
         cmd = [
             sys.executable,
             "-m",
@@ -48,6 +51,8 @@ def build_all():
             "--windowed",
             "--name",
             name,
+            f"--icon={icon_path}",
+            f"--add-data={assets_dir};assets",
             f"--paths={BASE_DIR}",
             entry,
         ]

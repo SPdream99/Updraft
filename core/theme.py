@@ -130,21 +130,72 @@ def apply_win7_theme(root: tk.Tk):
         thickness=18,
     )
 
+    # Automatically set window icon
+    apply_window_icon(root)
 
-def create_win7_header(parent: tk.Widget, title: str, subtitle: str) -> tk.Widget:
+
+def get_asset_path(filename: str) -> str:
+    """Returns absolute path to an asset, supporting PyInstaller bundles and development environments."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, "assets", filename)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, "assets", filename)
+
+
+_cached_icon_image = None
+_cached_header_logo = None
+
+
+def apply_window_icon(window: tk.Widget):
+    """Sets the Updraft application icon on any Tk or Toplevel window."""
+    global _cached_icon_image
+    try:
+        ico_path = get_asset_path("icon.ico")
+        if os.path.exists(ico_path):
+            window.iconbitmap(ico_path)
+    except Exception:
+        pass
+
+    try:
+        png_path = get_asset_path("icon.png")
+        if os.path.exists(png_path):
+            if _cached_icon_image is None:
+                _cached_icon_image = tk.PhotoImage(file=png_path)
+            window.iconphoto(True, _cached_icon_image)
+    except Exception:
+        pass
+
+
+def create_win7_header(parent: tk.Widget, title: str, subtitle: str, show_logo: bool = True) -> tk.Widget:
     """
-    Creates a clean Windows 7 Aero wizard / dialog header banner.
+    Creates a clean Windows 7 Aero wizard / dialog header banner with the Updraft logo.
     """
+    global _cached_header_logo
     header_frame = ttk.Frame(parent, style="Header.TFrame")
     header_frame.pack(fill="x", side="top")
 
-    content_frame = ttk.Frame(header_frame, style="Header.TFrame", padding=(16, 12))
+    content_frame = ttk.Frame(header_frame, style="Header.TFrame", padding=(16, 10))
     content_frame.pack(fill="x")
 
-    lbl_title = ttk.Label(content_frame, text=title, style="HeaderTitle.TLabel")
+    if show_logo:
+        try:
+            logo_path = get_asset_path("header_logo.png")
+            if os.path.exists(logo_path):
+                if _cached_header_logo is None:
+                    _cached_header_logo = tk.PhotoImage(file=logo_path)
+                lbl_icon = ttk.Label(content_frame, image=_cached_header_logo, background=HEADER_BG)
+                lbl_icon.image = _cached_header_logo
+                lbl_icon.pack(side="right", padx=(10, 4))
+        except Exception:
+            pass
+
+    text_box = ttk.Frame(content_frame, style="Header.TFrame")
+    text_box.pack(side="left", fill="both", expand=True)
+
+    lbl_title = ttk.Label(text_box, text=title, style="HeaderTitle.TLabel")
     lbl_title.pack(anchor="w")
 
-    lbl_sub = ttk.Label(content_frame, text=subtitle, style="HeaderSub.TLabel")
+    lbl_sub = ttk.Label(text_box, text=subtitle, style="HeaderSub.TLabel")
     lbl_sub.pack(anchor="w", pady=(2, 0))
 
     # Divider line beneath header

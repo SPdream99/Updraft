@@ -1,11 +1,20 @@
-# Updraft - Git Project Updater Control
+<p align="center">
+  <img src="assets/logo.png" alt="Updraft Logo" width="128" height="128">
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Build](https://github.com/SPdream99/updraft/actions/workflows/build.yml/badge.svg)](https://github.com/SPdream99/updraft/actions/workflows/build.yml)
-[![Releases](https://img.shields.io/github/v/release/SPdream99/updraft)](https://github.com/SPdream99/updraft/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)](https://github.com/SPdream99/updraft/releases)
+<h1 align="center">Updraft</h1>
+<p align="center"><strong>Git Project Updater Control</strong></p>
 
-A standalone updater suite for any GitHub project. Drop it in any folder, point it at a repository, and it handles downloading, extracting, and keeping your project up to date — automatically.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/SPdream99/updraft/actions/workflows/build.yml"><img src="https://github.com/SPdream99/updraft/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/SPdream99/updraft/releases"><img src="https://img.shields.io/github/v/release/SPdream99/updraft" alt="Releases"></a>
+  <a href="https://github.com/SPdream99/updraft/releases"><img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform"></a>
+</p>
+
+<p align="center">
+  A standalone updater suite for any GitHub project. Drop it in any folder, point it at a repository, and it handles downloading, extracting, and keeping your project up to date — automatically.
+</p>
 
 ---
 

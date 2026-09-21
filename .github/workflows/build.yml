@@ -19,7 +19,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: pip install requests pyinstaller pywin32
+        run: pip install requests pyinstaller pywin32 pillow
 
       - name: Build executables
         run: python build.py
