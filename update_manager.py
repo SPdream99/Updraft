@@ -8,6 +8,13 @@ if CURRENT_DIR not in sys.path:
 
 
 def main():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Updraft.SimpleUpdater")
+        except Exception:
+            pass
+
     if "--startup" in sys.argv or "--silent" in sys.argv:
         from core.startup import run_startup_update_all
         run_startup_update_all()

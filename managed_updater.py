@@ -12,6 +12,13 @@ from gui.updater_window import UpdaterMainWindow
 
 
 def main():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Updraft.SimpleUpdater")
+        except Exception:
+            pass
+
     if getattr(sys, "frozen", False):
         exe_path = sys.executable
         app_dir = os.path.dirname(exe_path)

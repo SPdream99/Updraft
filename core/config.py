@@ -29,26 +29,64 @@ def get_managed_registry_path() -> str:
 
 SHORTCUT_DEPTH_OPTIONS = [
     "Root level only (Files directly in main/)",
-    "Up to 1 level of subfolders (Level 1 and above: main/*)",
-    "Up to 2 levels of subfolders (Level 2 and above: main/*/*)",
-    "Up to 3 levels of subfolders (Level 3 and above: main/*/*/*)",
+    "Up to 1 level of subfolders (main/*) (Recommended)",
+    "Up to 2 levels of subfolders (main/*/*)",
+    "Up to 3 levels of subfolders (main/*/*/*)",
     "All subfolder levels (Unlimited)",
 ]
 
 SHORTCUT_DEPTH_MAP = {
     "Root level only (Files directly in main/)": 0,
+    "Up to 1 level of subfolders (main/*) (Recommended)": 1,
     "Up to 1 level of subfolders (Level 1 and above: main/*)": 1,
+    "Up to 2 levels of subfolders (main/*/*)": 2,
     "Up to 2 levels of subfolders (Level 2 and above: main/*/*)": 2,
+    "Up to 3 levels of subfolders (main/*/*/*)": 3,
     "Up to 3 levels of subfolders (Level 3 and above: main/*/*/*)": 3,
     "All subfolder levels (Unlimited)": -1,
 }
 
+SHORTCUT_LAYOUT_OPTIONS = [
+    "Project root folder (Standard)",
+    "Dedicated 'Shortcuts' folder",
+]
+
+SHORTCUT_LAYOUT_MAP = {
+    "Project root folder (Standard)": "root",
+    "Dedicated 'Shortcuts' folder": "shortcuts_folder",
+}
+
+DEFAULT_SHORTCUT_EXCLUDED_DIRS = {
+    ".git",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "env",
+    "node_modules",
+    "build",
+    "dist",
+    ".idea",
+    ".vscode",
+    "temp",
+    "tmp",
+    ".github",
+}
+
 
 def get_depth_label_from_level(level: int) -> str:
-    for label, val in SHORTCUT_DEPTH_MAP.items():
-        if val == level:
+    for label in SHORTCUT_DEPTH_OPTIONS:
+        if SHORTCUT_DEPTH_MAP.get(label) == level:
             return label
-    return "All subfolder levels (Unlimited)"
+    if level == 1:
+        return SHORTCUT_DEPTH_OPTIONS[1]
+    return SHORTCUT_DEPTH_OPTIONS[4]
+
+
+def get_layout_label_from_id(layout_id: str) -> str:
+    for label, val in SHORTCUT_LAYOUT_MAP.items():
+        if val == layout_id:
+            return label
+    return SHORTCUT_LAYOUT_OPTIONS[0]
 
 
 class UpdaterConfig:
@@ -85,8 +123,17 @@ class UpdaterConfig:
             "run_script_after_update": "false",
             "auto_update_on_startup": "true",
             "auto_update_self": "true",
+            "create_shortcuts": "true",
+            "create_folder_shortcuts": "true",
+            "shortcut_folder_level": "1",
+            "shortcut_include_executables": "true",
+            "shortcut_include_python": "true",
+            "shortcut_include_docs": "true",
+            "shortcut_layout": "root",
+            "shortcut_prefix": "",
         }
         self.config["ExcludedFiles"] = {}
+        self.config["ShortcutRules"] = {}
 
     def ensure_done_script(self):
         """Creates update-done.bat in project folder if it does not already exist."""
@@ -205,12 +252,90 @@ class UpdaterConfig:
         self.config.set("Settings", "create_shortcuts", "true" if value else "false")
 
     @property
+    def create_folder_shortcuts(self) -> bool:
+        return self.config.getboolean("Settings", "create_folder_shortcuts", fallback=True)
+
+    @create_folder_shortcuts.setter
+    def create_folder_shortcuts(self, value: bool):
+        self.config.set("Settings", "create_folder_shortcuts", "true" if value else "false")
+
+    @property
     def shortcut_folder_level(self) -> int:
-        return self.config.getint("Settings", "shortcut_folder_level", fallback=-1)
+        return self.config.getint("Settings", "shortcut_folder_level", fallback=1)
 
     @shortcut_folder_level.setter
     def shortcut_folder_level(self, value: int):
         self.config.set("Settings", "shortcut_folder_level", str(value))
+
+    @property
+    def shortcut_include_executables(self) -> bool:
+        return self.config.getboolean("Settings", "shortcut_include_executables", fallback=True)
+
+    @shortcut_include_executables.setter
+    def shortcut_include_executables(self, value: bool):
+        self.config.set("Settings", "shortcut_include_executables", "true" if value else "false")
+
+    @property
+    def shortcut_include_python(self) -> bool:
+        return self.config.getboolean("Settings", "shortcut_include_python", fallback=True)
+
+    @shortcut_include_python.setter
+    def shortcut_include_python(self, value: bool):
+        self.config.set("Settings", "shortcut_include_python", "true" if value else "false")
+
+    @property
+    def shortcut_include_docs(self) -> bool:
+        return self.config.getboolean("Settings", "shortcut_include_docs", fallback=True)
+
+    @shortcut_include_docs.setter
+    def shortcut_include_docs(self, value: bool):
+        self.config.set("Settings", "shortcut_include_docs", "true" if value else "false")
+
+    @property
+    def shortcut_layout(self) -> str:
+        return self.config.get("Settings", "shortcut_layout", fallback="root")
+
+    @shortcut_layout.setter
+    def shortcut_layout(self, value: str):
+        self.config.set("Settings", "shortcut_layout", value)
+
+    @property
+    def shortcut_prefix(self) -> str:
+        return self.config.get("Settings", "shortcut_prefix", fallback="")
+
+    @shortcut_prefix.setter
+    def shortcut_prefix(self, value: str):
+        self.config.set("Settings", "shortcut_prefix", value)
+
+    # --- Project-Specific Shortcut Rules ---
+    def get_shortcut_rules(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Returns a dict mapping normalized relative path to {'enabled': bool, 'custom_name': str}.
+        """
+        if "ShortcutRules" not in self.config:
+            return {}
+        result = {}
+        for rel_path, val in self.config["ShortcutRules"].items():
+            norm_path = rel_path.replace("\\", "/").strip()
+            parts = val.split("|", 1)
+            enabled_str = parts[0].strip() if len(parts) > 0 else "1"
+            custom_name = parts[1].strip() if len(parts) > 1 else ""
+            result[norm_path] = {
+                "enabled": enabled_str != "0",
+                "custom_name": custom_name,
+            }
+        return result
+
+    def set_shortcut_rule(self, rel_path: str, enabled: bool = True, custom_name: str = ""):
+        norm_path = rel_path.replace("\\", "/").strip()
+        if "ShortcutRules" not in self.config:
+            self.config["ShortcutRules"] = {}
+        self.config["ShortcutRules"][norm_path] = f"{'1' if enabled else '0'}|{custom_name}"
+
+    def remove_shortcut_rule(self, rel_path: str):
+        norm_path = rel_path.replace("\\", "/").strip()
+        if "ShortcutRules" in self.config and norm_path in self.config["ShortcutRules"]:
+            del self.config["ShortcutRules"][norm_path]
 
     # --- Excluded Files ---
     def get_excluded_files(self) -> Dict[str, Dict[str, str]]:
@@ -317,7 +442,9 @@ class ManagedRegistry:
                         "auto_update_on_startup": False,
                         "auto_update_self": True,
                         "create_shortcuts": True,
-                        "shortcut_folder_level": -1,
+                        "create_folder_shortcuts": True,
+                        "shortcut_folder_level": 1,
+                        "shortcut_layout": "root",
                     }
                 }
 
@@ -380,13 +507,17 @@ class ManagedRegistry:
             del self.data["instances"][norm_dir]
             self.save()
 
-    def get_global_settings(self) -> Dict[str, bool]:
+    def get_global_settings(self) -> Dict[str, Any]:
         return self.data.get("global_settings", {
             "open_when_done": True,
             "delete_compressed": True,
             "run_script_after_update": False,
             "auto_update_on_startup": False,
             "auto_update_self": True,
+            "create_shortcuts": True,
+            "create_folder_shortcuts": True,
+            "shortcut_folder_level": 1,
+            "shortcut_layout": "root",
         })
 
     def save_global_settings(
@@ -397,7 +528,9 @@ class ManagedRegistry:
         auto_update_on_startup: bool = False,
         auto_update_self: bool = True,
         create_shortcuts: bool = True,
-        shortcut_folder_level: int = -1,
+        shortcut_folder_level: int = 1,
+        create_folder_shortcuts: bool = True,
+        shortcut_layout: str = "root",
     ):
         self.data["global_settings"] = {
             "open_when_done": open_when_done,
@@ -407,6 +540,8 @@ class ManagedRegistry:
             "auto_update_self": auto_update_self,
             "create_shortcuts": create_shortcuts,
             "shortcut_folder_level": shortcut_folder_level,
+            "create_folder_shortcuts": create_folder_shortcuts,
+            "shortcut_layout": shortcut_layout,
         }
         self.save()
 

@@ -600,8 +600,119 @@ class TestShortcutCreation(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "sub2_app.bat")))
 
 
+    def test_subfolder_shortcut_discovery(self):
+        from core.downloader import discover_project_shortcuts
+        self.cfg.create_folder_shortcuts = True
+        self.cfg.shortcut_folder_level = 1
+        self.cfg.save()
+
+        candidates = discover_project_shortcuts(self.test_dir, self.cfg)
+        folder_candidates = [c for c in candidates if c["type"] == "folder"]
+        self.assertTrue(any(c["base_name"] == "level1" for c in folder_candidates))
+        # level2 is at level 2, so should not be included when max_depth is 1
+        self.assertFalse(any(c["base_name"] == "level2" for c in folder_candidates))
+
+    def test_shortcut_custom_rules_and_prefix(self):
+        from core.downloader import discover_project_shortcuts
+        self.cfg.shortcut_prefix = "Run "
+        self.cfg.set_shortcut_rule("main/root_app.py", enabled=True, custom_name="Launch Master App")
+        self.cfg.set_shortcut_rule("main/level1", enabled=False)
+        self.cfg.save()
+
+        candidates = discover_project_shortcuts(self.test_dir, self.cfg)
+        app_cand = next((c for c in candidates if "root_app.py" in c["rel_path"]), None)
+        self.assertIsNotNone(app_cand)
+        self.assertEqual(app_cand["effective_name"], "Launch Master App")
+        self.assertEqual(app_cand["output_filename"], "Launch Master App.bat")
+
+        level1_cand = next((c for c in candidates if c["base_name"] == "level1"), None)
+        self.assertIsNotNone(level1_cand)
+        self.assertFalse(level1_cand["enabled"])
+
+    def test_shortcut_layout_folder(self):
+        self.cfg.create_shortcuts = True
+        self.cfg.shortcut_layout = "shortcuts_folder"
+        self.cfg.save()
+
+        shortcuts = self.engine.create_shortcuts()
+        self.assertTrue(len(shortcuts) > 0)
+        shortcuts_dir = os.path.join(self.test_dir, "Shortcuts")
+        self.assertTrue(os.path.exists(shortcuts_dir))
+        for p in shortcuts:
+            self.assertTrue(p.startswith(shortcuts_dir))
+
+
+class TestExcludeFilterSortSearch(unittest.TestCase):
+    def test_format_size(self):
+        from gui.exclude_window import format_size
+        self.assertEqual(format_size(500), "500 B")
+        self.assertEqual(format_size(2048), "2.0 KB")
+        self.assertEqual(format_size(1024 * 1024 * 3), "3.0 MB")
+        self.assertEqual(format_size(1024 * 1024 * 1024 * 2), "2.0 GB")
+
+    def test_matches_search(self):
+        from gui.exclude_window import matches_search
+        item = {"name": "config.json", "rel_path": "settings/config.json"}
+        self.assertTrue(matches_search(item, ""))
+        self.assertTrue(matches_search(item, "config"))
+        self.assertTrue(matches_search(item, "settings"))
+        self.assertTrue(matches_search(item, "JSON"))
+        self.assertFalse(matches_search(item, "missing"))
+
+    def test_matches_filter(self):
+        from gui.exclude_window import matches_filter
+
+        item_ex = {"name": "save.dat", "rel_path": "saves/save.dat", "ext": ".dat"}
+        item_inc = {"name": "app.exe", "rel_path": "bin/app.exe", "ext": ".exe"}
+        item_cfg = {"name": "settings.ini", "rel_path": "config/settings.ini", "ext": ".ini"}
+        item_py = {"name": "script.py", "rel_path": "scripts/script.py", "ext": ".py"}
+
+        excluded_map = {
+            "saves/save.dat": {"version_name": "v1.0.0", "version_date": "2026-01-01"},
+        }
+
+        # All Files
+        self.assertTrue(matches_filter(item_ex, "All Files", excluded_map, lambda v, d: False))
+        self.assertTrue(matches_filter(item_inc, "All Files", excluded_map, lambda v, d: False))
+
+        # Excluded Only
+        self.assertTrue(matches_filter(item_ex, "Excluded Only", excluded_map, lambda v, d: False))
+        self.assertFalse(matches_filter(item_inc, "Excluded Only", excluded_map, lambda v, d: False))
+
+        # Included Only
+        self.assertFalse(matches_filter(item_ex, "Included Only", excluded_map, lambda v, d: False))
+        self.assertTrue(matches_filter(item_inc, "Included Only", excluded_map, lambda v, d: False))
+
+        # Update Available
+        self.assertTrue(matches_filter(item_ex, "Update Available", excluded_map, lambda v, d: True))
+        self.assertFalse(matches_filter(item_ex, "Update Available", excluded_map, lambda v, d: False))
+
+        # Type Filters
+        self.assertTrue(matches_filter(item_inc, "Executables (*.exe, *.bat, *.cmd)", excluded_map, lambda v, d: False))
+        self.assertFalse(matches_filter(item_cfg, "Executables (*.exe, *.bat, *.cmd)", excluded_map, lambda v, d: False))
+
+        self.assertTrue(matches_filter(item_cfg, "Config & Data (*.ini, *.json, *.xml, *.cfg)", excluded_map, lambda v, d: False))
+        self.assertFalse(matches_filter(item_inc, "Config & Data (*.ini, *.json, *.xml, *.cfg)", excluded_map, lambda v, d: False))
+
+        self.assertTrue(matches_filter(item_py, "Python & Scripts (*.py, *.ps1, *.js)", excluded_map, lambda v, d: False))
+        self.assertFalse(matches_filter(item_cfg, "Python & Scripts (*.py, *.ps1, *.js)", excluded_map, lambda v, d: False))
+
+    def test_get_sort_key(self):
+        from gui.exclude_window import get_sort_key
+        item1 = {"name": "Beta.txt", "rel_path": "b/Beta.txt", "rel_dir": "b", "size_bytes": 100, "ext": ".txt"}
+        item2 = {"name": "alpha.txt", "rel_path": "a/alpha.txt", "rel_dir": "a", "size_bytes": 500, "ext": ".txt"}
+        excluded_map = {"b/Beta.txt": {}}
+
+        self.assertEqual(get_sort_key(item1, "name", excluded_map), "beta.txt")
+        self.assertEqual(get_sort_key(item1, "folder", excluded_map), "b")
+        self.assertEqual(get_sort_key(item1, "status", excluded_map), 0)
+        self.assertEqual(get_sort_key(item2, "status", excluded_map), 1)
+        self.assertEqual(get_sort_key(item1, "size", excluded_map), 100)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
 

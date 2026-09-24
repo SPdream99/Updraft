@@ -5,8 +5,8 @@ import sys
 import tarfile
 import urllib.request
 import zipfile
-from typing import Callable, List, Optional, Tuple, Dict
-from core.config import UpdaterConfig
+from typing import Callable, List, Optional, Tuple, Dict, Any
+from core.config import UpdaterConfig, DEFAULT_SHORTCUT_EXCLUDED_DIRS
 from core.git_client import USER_AGENT, GitHubClient, GitRepoInfo
 
 
@@ -15,7 +15,7 @@ def is_archive(filename: str) -> bool:
     return lower.endswith(".zip") or lower.endswith(".tar.gz") or lower.endswith(".tgz") or lower.endswith(".tar")
 
 
-EXECUTABLE_EXTENSIONS = {
+BINARY_EXTENSIONS = {
     ".exe",
     ".bat",
     ".cmd",
@@ -27,11 +27,20 @@ EXECUTABLE_EXTENSIONS = {
     ".wsf",
     ".wsh",
     ".msc",
-    ".html",
-    ".htm",
+}
+
+PYTHON_EXTENSIONS = {
     ".py",
     ".pyw",
 }
+
+DOC_EXTENSIONS = {
+    ".html",
+    ".htm",
+    ".url",
+}
+
+EXECUTABLE_EXTENSIONS = BINARY_EXTENSIONS | PYTHON_EXTENSIONS | DOC_EXTENSIONS
 
 
 def is_executable(filename: str) -> bool:
@@ -72,11 +81,15 @@ def create_windows_shortcut(target_path: str, shortcut_path: str, working_dir: O
     """
     Creates a Windows .lnk shortcut using WScript.Shell via PowerShell.
     Special handling for .ps1 scripts ensures they execute with PowerShell rather than opening in a text editor.
+    Folders are linked natively to open in Windows Explorer.
     """
     if sys.platform != "win32":
         return
     if working_dir is None:
-        working_dir = os.path.dirname(target_path)
+        if os.path.isdir(target_path):
+            working_dir = target_path
+        else:
+            working_dir = os.path.dirname(target_path)
     
     target_path = os.path.abspath(target_path)
     shortcut_path = os.path.abspath(shortcut_path)
@@ -114,6 +127,151 @@ def create_windows_shortcut(target_path: str, shortcut_path: str, working_dir: O
         )
     except Exception as e:
         print(f"Warning: Failed to create shortcut for {target_path}: {e}")
+
+
+def discover_project_shortcuts(
+    project_dir: str,
+    config: Optional[UpdaterConfig] = None
+) -> List[Dict[str, Any]]:
+    """
+    Scans the project's main/ folder for shortcut candidates:
+    - Executables (.exe, .bat, .cmd, .ps1, etc.)
+    - Python scripts (.py, .pyw)
+    - Web links and documents (.html, .htm, .url)
+    - Subfolders up to configured level (if enabled)
+
+    Applies per-project rules and customization settings from config:
+    - shortcut_folder_level
+    - create_folder_shortcuts
+    - shortcut_include_executables
+    - shortcut_include_python
+    - shortcut_include_docs
+    - shortcut_prefix
+    - [ShortcutRules] overrides in updater-info.ini
+    """
+    project_dir = os.path.abspath(project_dir)
+    main_dir = os.path.join(project_dir, "main")
+    if not os.path.exists(main_dir):
+        return []
+
+    if config is None:
+        config = UpdaterConfig(project_dir)
+
+    max_depth = getattr(config, "shortcut_folder_level", 1)
+    allow_folders = getattr(config, "create_folder_shortcuts", True)
+    inc_executables = getattr(config, "shortcut_include_executables", True)
+    inc_python = getattr(config, "shortcut_include_python", True)
+    inc_docs = getattr(config, "shortcut_include_docs", True)
+    prefix = getattr(config, "shortcut_prefix", "").strip()
+    rules = config.get_shortcut_rules()
+
+    candidates: List[Dict[str, Any]] = []
+
+    for root, dirs, files in os.walk(main_dir):
+        # Exclude hidden directories, python cache, and noise directories
+        dirs[:] = [
+            d for d in dirs
+            if not d.startswith(".") and d.lower() not in DEFAULT_SHORTCUT_EXCLUDED_DIRS
+        ]
+
+        rel = os.path.relpath(root, main_dir)
+        if rel == ".":
+            current_level = 0
+        else:
+            current_level = len(rel.replace("\\", "/").split("/"))
+
+        # Discover subdirectories as folder shortcut candidates
+        if allow_folders:
+            for d in list(dirs):
+                folder_level = current_level + 1
+                if max_depth >= 0 and folder_level > max_depth:
+                    continue
+                folder_full_path = os.path.join(root, d)
+                folder_rel_path = os.path.relpath(folder_full_path, project_dir).replace("\\", "/")
+                rule = rules.get(folder_rel_path, {})
+                custom_name = rule.get("custom_name", "")
+                enabled = rule.get("enabled", True) if "enabled" in rule else True
+
+                base_name = d
+                if custom_name:
+                    display_name = custom_name
+                elif prefix:
+                    sep = "" if prefix[-1] in (" ", "-", "_") else " "
+                    display_name = f"{prefix}{sep}{base_name}"
+                else:
+                    display_name = base_name
+
+                candidates.append({
+                    "target_path": folder_full_path,
+                    "rel_path": folder_rel_path,
+                    "type": "folder",
+                    "base_name": base_name,
+                    "custom_name": custom_name,
+                    "effective_name": display_name,
+                    "output_filename": f"{display_name}.lnk",
+                    "enabled": enabled,
+                    "level": folder_level,
+                })
+
+        # Stop descending deeper if max_depth reached
+        if max_depth >= 0 and current_level >= max_depth:
+            dirs.clear()
+
+        # Skip files if beyond max_depth
+        if max_depth >= 0 and current_level > max_depth:
+            continue
+
+        for file in sorted(files):
+            if file.startswith("__") or file.startswith("."):
+                continue
+
+            full_path = os.path.join(root, file)
+            base_name, ext = os.path.splitext(file)
+            ext_lower = ext.lower()
+
+            item_type = None
+            cat_default_enabled = True
+
+            if ext_lower in PYTHON_EXTENSIONS:
+                item_type = "python"
+                cat_default_enabled = inc_python
+            elif ext_lower in BINARY_EXTENSIONS:
+                item_type = "binary"
+                cat_default_enabled = inc_executables
+            elif ext_lower in DOC_EXTENSIONS:
+                item_type = "doc"
+                cat_default_enabled = inc_docs
+
+            if not item_type:
+                continue
+
+            rel_path = os.path.relpath(full_path, project_dir).replace("\\", "/")
+            rule = rules.get(rel_path, {})
+            custom_name = rule.get("custom_name", "")
+            enabled = rule.get("enabled", cat_default_enabled) if "enabled" in rule else cat_default_enabled
+
+            if custom_name:
+                display_name = custom_name
+            elif prefix:
+                sep = "" if prefix[-1] in (" ", "-", "_") else " "
+                display_name = f"{prefix}{sep}{base_name}"
+            else:
+                display_name = base_name
+
+            out_ext = ".bat" if item_type == "python" else ".lnk"
+            candidates.append({
+                "target_path": full_path,
+                "rel_path": rel_path,
+                "type": item_type,
+                "base_name": base_name,
+                "custom_name": custom_name,
+                "effective_name": display_name,
+                "output_filename": f"{display_name}{out_ext}",
+                "enabled": enabled,
+                "level": current_level,
+            })
+
+    return candidates
 
 
 class UpdateEngine:
@@ -288,69 +446,53 @@ class UpdateEngine:
 
     def create_shortcuts(self) -> List[str]:
         """
-        Creates Windows shortcuts (.lnk) or .bat launchers in the project directory for any
-        executables, scripts, HTML, or Python files found inside main/.
-        Python scripts (.py/.pyw) are wrapped in .bat launchers so they run with python instead of a normal shortcut.
-        Respects self.config.create_shortcuts and self.config.shortcut_folder_level.
+        Creates Windows shortcuts (.lnk) or .bat launchers in the project directory
+        or dedicated Shortcuts folder for discovered items.
+        Respects self.config.create_shortcuts, layout, prefix, and per-project rules.
         """
         self.config.load()
         if not getattr(self.config, "create_shortcuts", True):
             return []
 
-        if not os.path.exists(self.main_dir):
+        candidates = discover_project_shortcuts(self.project_dir, self.config)
+        if not candidates:
             return []
 
+        layout = getattr(self.config, "shortcut_layout", "root")
+        if layout == "shortcuts_folder":
+            dest_dir = os.path.join(self.project_dir, "Shortcuts")
+            os.makedirs(dest_dir, exist_ok=True)
+        else:
+            dest_dir = self.project_dir
+
         created = []
-        max_depth = getattr(self.config, "shortcut_folder_level", -1)
+        used_names = set()
 
-        for root, dirs, files in os.walk(self.main_dir):
-            # Exclude hidden directories and python caches
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
-
-            # Calculate depth relative to self.main_dir
-            rel = os.path.relpath(root, self.main_dir)
-            if rel == ".":
-                level = 0
-            else:
-                level = len(rel.replace("\\", "/").split("/"))
-
-            # If max_depth is specified and reached, don't descend into deeper subdirectories
-            if max_depth >= 0 and level >= max_depth:
-                dirs.clear()
-
-            # If current folder level is beyond max_depth, skip files
-            if max_depth >= 0 and level > max_depth:
+        for item in candidates:
+            if not item["enabled"]:
                 continue
 
-            for file in files:
-                if file.startswith("__"):
-                    continue
-                if is_executable(file):
-                    target_file = os.path.join(root, file)
-                    base_name, ext = os.path.splitext(file)
-                    ext_lower = ext.lower()
+            target_path = item["target_path"]
+            item_type = item["type"]
 
-                    if ext_lower in {".py", ".pyw"}:
-                        bat_name = f"{base_name}.bat"
-                        bat_path = os.path.join(self.project_dir, bat_name)
-                        if os.path.exists(bat_path):
-                            bat_name = f"{base_name} (py).bat"
-                            bat_path = os.path.join(self.project_dir, bat_name)
+            # Handle duplicate file names in destination
+            candidate_name = item["output_filename"]
+            out_base, out_ext = os.path.splitext(candidate_name)
+            counter = 2
+            while candidate_name in used_names:
+                candidate_name = f"{out_base} ({counter}){out_ext}"
+                counter += 1
+            used_names.add(candidate_name)
 
-                        rel_dir = os.path.relpath(root, self.project_dir)
-                        create_python_bat_launcher(target_file, bat_path, rel_dir)
-                        created.append(bat_path)
-                    else:
-                        shortcut_name = f"{base_name}.lnk"
-                        shortcut_path = os.path.join(self.project_dir, shortcut_name)
+            dest_file_path = os.path.join(dest_dir, candidate_name)
 
-                        # If multiple files share the same base name, prevent overwrite by appending extension
-                        if os.path.exists(shortcut_path):
-                            shortcut_name = f"{base_name} ({ext.lstrip('.')}).lnk"
-                            shortcut_path = os.path.join(self.project_dir, shortcut_name)
-
-                        create_windows_shortcut(target_file, shortcut_path, working_dir=os.path.dirname(target_file))
-                        created.append(shortcut_path)
+            if item_type == "python":
+                rel_dir = os.path.relpath(os.path.dirname(target_path), dest_dir)
+                create_python_bat_launcher(target_path, dest_file_path, rel_dir)
+                created.append(dest_file_path)
+            else:
+                create_windows_shortcut(target_path, dest_file_path)
+                created.append(dest_file_path)
 
         return created
 

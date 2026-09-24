@@ -507,7 +507,8 @@ class UpdaterMainWindow(tk.Tk):
             created = self.engine.create_shortcuts()
             if created:
                 count = len(created)
-                msg = f"Successfully created {count} shortcut/launcher file(s) in the project directory:\n\n"
+                dest_desc = "Shortcuts folder" if getattr(self.config, "shortcut_layout", "root") == "shortcuts_folder" else "the project directory"
+                msg = f"Successfully created {count} shortcut/launcher file(s) in {dest_desc}:\n\n"
                 sample = "\n".join(f"• {os.path.basename(p)}" for p in created[:8])
                 if count > 8:
                     sample += f"\n...and {count - 8} more."
@@ -517,7 +518,7 @@ class UpdaterMainWindow(tk.Tk):
             else:
                 messagebox.showinfo(
                     "No Shortcuts Created",
-                    "No executable files, HTML documents, or Python scripts were found to create shortcuts for within the configured subfolder depth.",
+                    "No matching executable files, HTML documents, Python scripts, or subfolders were found or enabled to create shortcuts for.",
                     parent=self
                 )
                 self.lbl_status.config(text="Ready", foreground=MUTED_TEXT)

@@ -75,7 +75,8 @@ class InstallWizard(tk.Tk):
         self.var_delete_compressed = tk.BooleanVar(value=True)
         self.var_run_script = tk.BooleanVar(value=False)
         self.var_create_shortcuts = tk.BooleanVar(value=True)
-        self.var_shortcut_depth = tk.StringVar(value=SHORTCUT_DEPTH_OPTIONS[4])
+        self.var_create_folders = tk.BooleanVar(value=True)
+        self.var_shortcut_depth = tk.StringVar(value=SHORTCUT_DEPTH_OPTIONS[1])
 
         self._build_ui()
         self._show_step(1)
@@ -319,7 +320,15 @@ class InstallWizard(tk.Tk):
             variable=self.var_create_shortcuts,
             command=self._toggle_shortcut_options
         )
-        chk_shortcuts.pack(anchor="w", pady=(4, 4))
+        chk_shortcuts.pack(anchor="w", pady=(4, 2))
+
+        self.chk_create_folders = ttk.Checkbutton(
+            group,
+            text="Include shortcuts to subfolders (e.g. saves, docs, tools)",
+            variable=self.var_create_folders,
+            state="normal" if self.var_create_shortcuts.get() else "disabled"
+        )
+        self.chk_create_folders.pack(anchor="w", padx=(24, 0), pady=(0, 2))
 
         depth_frame = ttk.Frame(group)
         depth_frame.pack(fill="x", padx=(24, 0), pady=(0, 4))
@@ -348,9 +357,12 @@ class InstallWizard(tk.Tk):
         ttk.Label(summary_group, text=f"Shortcuts: {shortcut_info}").pack(anchor="w", pady=2)
 
     def _toggle_shortcut_options(self):
+        state = "normal" if self.var_create_shortcuts.get() else "disabled"
+        cbo_state = "readonly" if self.var_create_shortcuts.get() else "disabled"
+        if hasattr(self, "chk_create_folders"):
+            self.chk_create_folders.config(state=state)
         if hasattr(self, "cbo_shortcut_depth"):
-            state = "readonly" if self.var_create_shortcuts.get() else "disabled"
-            self.cbo_shortcut_depth.config(state=state)
+            self.cbo_shortcut_depth.config(state=cbo_state)
 
     # --- STEP 4: Progress ---
     def _render_step_4_progress(self):
@@ -447,7 +459,8 @@ class InstallWizard(tk.Tk):
             config.delete_compressed = self.var_delete_compressed.get()
             config.run_script_after_update = self.var_run_script.get()
             config.create_shortcuts = self.var_create_shortcuts.get()
-            config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), -1)
+            config.create_folder_shortcuts = self.var_create_folders.get()
+            config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), 1)
 
             # Record version information
             if config.update_type == "source":

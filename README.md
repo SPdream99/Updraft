@@ -92,8 +92,12 @@ Protect local configurations, save files, or custom scripts from being overwritt
   <img src="docs/images/exclude_files.png" alt="File Exclusion Manager" width="75%">
 </p>
 
-- Left pane: Explorer tree with checkboxes for files and folders in `main/`.
-- Right pane: Version metadata for selected files, with an **Update This File** button enabled whenever an excluded file is older than the current project release.
+- **Real-time search**: Search files instantly by filename or relative path with a single-click clear button.
+- **Multi-criteria filters**: Filter by All Files, Excluded Only, Included Only, Updates Available, Executables, Configurations & Data, or Python & Scripts.
+- **Interactive sorting**: Click column headers (Name, Folder, Excluded?, Size) to toggle ascending/descending sort, or pick from the Sort dropdown.
+- **View modes**: Switch between Hierarchical Folder Tree and Flat List view.
+- **Batch operations**: One-click actions to Exclude All Filtered, Include All Filtered, or Invert Filtered Selection.
+- **Individual updates**: Update a single protected file from the repository when a newer version is available.
 
 ---
 
@@ -217,7 +221,7 @@ python -m unittest discover -s tests
 - Antigravity contributed to the development of this app.
 - The `update-done.bat` file is created blank on first install. Edit it to run any post-update commands (rebuild steps, restart scripts, etc.).
 - The `main/` folder and `updater-info.ini` are excluded from version control by default. Do not delete `updater-info.ini` unless you want to re-run the setup wizard.
-- Shortcuts are created in the project root folder for each `.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.wsf`, `.js`, and `.html`/`.htm` file found in `main/`. PowerShell shortcuts include an execution policy bypass. Python scripts (`.py`, `.pyw`) are automatically wrapped in a `.bat` launcher in the project root to run with Python and keep the terminal open on errors, rather than a normal shortcut.
+- Shortcuts: Automatically discovers executables (`.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, etc.), Python scripts (`.py`, `.pyw`), web/document links (`.html`, `.htm`, `.url`), and subfolders (e.g. saves, docs, tools) up to the configured folder depth (default: up to 1 level of subfolders). Subfolder shortcuts open directly in Windows Explorer. Python scripts are wrapped in launcher `.bat` files that auto-detect python/py and pause on errors. Each project can personalize shortcut rules, prefixes, and target folder layout (project root or dedicated `Shortcuts/` folder) via the Shortcut Customizer dialog.
 
 ---
 

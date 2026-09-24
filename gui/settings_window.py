@@ -5,7 +5,10 @@ from core.config import (
     UpdaterConfig,
     SHORTCUT_DEPTH_OPTIONS,
     SHORTCUT_DEPTH_MAP,
+    SHORTCUT_LAYOUT_OPTIONS,
+    SHORTCUT_LAYOUT_MAP,
     get_depth_label_from_level,
+    get_layout_label_from_id,
 )
 from core.theme import (
     apply_win7_theme,
@@ -15,6 +18,7 @@ from core.theme import (
     BG_COLOR,
     LIGHT_BORDER,
 )
+from gui.shortcut_dialog import ShortcutCustomizerDialog
 
 
 class SettingsDialog(tk.Toplevel):
@@ -107,11 +111,20 @@ class SettingsDialog(tk.Toplevel):
         )
         self.chk_create_shortcuts.pack(anchor="w", pady=(3, 2))
 
+        self.var_create_folders = tk.BooleanVar(value=getattr(self.config, "create_folder_shortcuts", True))
+        self.chk_create_folders = ttk.Checkbutton(
+            group,
+            text="Include shortcuts to subfolders (e.g. saves, docs, tools)",
+            variable=self.var_create_folders,
+            state="normal" if self.var_create_shortcuts.get() else "disabled"
+        )
+        self.chk_create_folders.pack(anchor="w", padx=(20, 0), pady=(0, 2))
+
         depth_frame = ttk.Frame(group)
-        depth_frame.pack(fill="x", padx=(24, 0), pady=(0, 4))
+        depth_frame.pack(fill="x", padx=(20, 0), pady=(0, 4))
 
         ttk.Label(depth_frame, text="Subfolder depth:").pack(side="left", padx=(0, 6))
-        current_level = getattr(self.config, "shortcut_folder_level", -1)
+        current_level = getattr(self.config, "shortcut_folder_level", 1)
         self.var_shortcut_depth = tk.StringVar(value=get_depth_label_from_level(current_level))
         self.cbo_shortcut_depth = ttk.Combobox(
             depth_frame,
@@ -120,7 +133,15 @@ class SettingsDialog(tk.Toplevel):
             state="readonly" if self.var_create_shortcuts.get() else "disabled",
             width=28
         )
-        self.cbo_shortcut_depth.pack(side="left")
+        self.cbo_shortcut_depth.pack(side="left", padx=(0, 8))
+
+        if not self.is_global:
+            btn_custom_shortcuts = ttk.Button(
+                depth_frame,
+                text="Customize...",
+                command=self._open_shortcut_customizer
+            )
+            btn_custom_shortcuts.pack(side="left")
 
         startup_val = getattr(self.config, "auto_update_on_startup", False if self.is_global else True)
         self.var_startup = tk.BooleanVar(value=startup_val)
@@ -150,16 +171,31 @@ class SettingsDialog(tk.Toplevel):
         self.chk_self_update.pack(anchor="w", pady=(3, 3))
 
     def _toggle_shortcut_options(self):
+        state = "normal" if self.var_create_shortcuts.get() else "disabled"
+        cbo_state = "readonly" if self.var_create_shortcuts.get() else "disabled"
+        if hasattr(self, "chk_create_folders"):
+            self.chk_create_folders.config(state=state)
         if hasattr(self, "cbo_shortcut_depth"):
-            state = "readonly" if self.var_create_shortcuts.get() else "disabled"
-            self.cbo_shortcut_depth.config(state=state)
+            self.cbo_shortcut_depth.config(state=cbo_state)
+
+    def _open_shortcut_customizer(self):
+        # Save current options to config first
+        self.config.create_shortcuts = self.var_create_shortcuts.get()
+        self.config.create_folder_shortcuts = self.var_create_folders.get()
+        self.config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), 1)
+        ShortcutCustomizerDialog(self, self.config, on_saved_callback=self._on_customizer_saved)
+
+    def _on_customizer_saved(self):
+        self.var_create_folders.set(self.config.create_folder_shortcuts)
+        self.var_shortcut_depth.set(get_depth_label_from_level(self.config.shortcut_folder_level))
 
     def _save_and_close(self):
         self.config.open_when_done = self.var_open.get()
         self.config.delete_compressed = self.var_delete.get()
         self.config.run_script_after_update = self.var_run_script.get()
         self.config.create_shortcuts = self.var_create_shortcuts.get()
-        self.config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), -1)
+        self.config.create_folder_shortcuts = self.var_create_folders.get()
+        self.config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), 1)
         self.config.auto_update_on_startup = self.var_startup.get()
         self.config.auto_update_self = self.var_self_update.get()
         self.config.save()

@@ -26,6 +26,14 @@ FONT_SUBTITLE = (FONT_FAMILY, 9)
 FONT_LARGE_BUTTON = (FONT_FAMILY, 10)
 FONT_CODE = ("Consolas", 9)
 
+# Register process with Windows taskbar so taskbar uses the app's logo icon
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Updraft.SimpleUpdater")
+    except Exception:
+        pass
+
 
 def apply_win7_theme(root: tk.Tk):
     """
@@ -33,8 +41,13 @@ def apply_win7_theme(root: tk.Tk):
     """
     root.configure(bg=BG_COLOR)
 
-    # Enable native Windows DPI awareness if on Windows
+    # Enable native Windows DPI awareness & taskbar app ID if on Windows
     if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Updraft.SimpleUpdater")
+        except Exception:
+            pass
         try:
             import ctypes
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -142,26 +155,45 @@ def get_asset_path(filename: str) -> str:
     return os.path.join(base_dir, "assets", filename)
 
 
-_cached_icon_image = None
+_cached_icon_images: list = []
 _cached_header_logo = None
 
 
 def apply_window_icon(window: tk.Widget):
-    """Sets the Updraft application icon on any Tk or Toplevel window."""
-    global _cached_icon_image
-    try:
-        ico_path = get_asset_path("icon.ico")
-        if os.path.exists(ico_path):
-            window.iconbitmap(ico_path)
-    except Exception:
-        pass
+    """Sets the Updraft application icon on any Tk or Toplevel window for title bar, Alt-Tab, and taskbar."""
+    global _cached_icon_images
 
+    # 1. Windows native iconbitmap (.ico with multi-resolution 16..256)
+    ico_path = get_asset_path("icon.ico")
+    if sys.platform == "win32" and os.path.exists(ico_path):
+        try:
+            if hasattr(window, "iconbitmap"):
+                # default=ico_path sets for root and future child toplevel windows
+                window.iconbitmap(default=ico_path)
+        except Exception:
+            try:
+                window.iconbitmap(ico_path)
+            except Exception:
+                pass
+
+    # 2. Tkinter iconphoto with multi-resolution PNGs (16, 24, 32, 48, 64, 128, 256)
+    # Tkinter selects the best matching size for taskbar (32/48) and titlebar (16)
     try:
-        png_path = get_asset_path("icon.png")
-        if os.path.exists(png_path):
-            if _cached_icon_image is None:
-                _cached_icon_image = tk.PhotoImage(file=png_path)
-            window.iconphoto(True, _cached_icon_image)
+        if not _cached_icon_images:
+            for s in [16, 24, 32, 48, 64, 128, 256]:
+                p = get_asset_path(f"icon_{s}.png")
+                if os.path.exists(p):
+                    try:
+                        _cached_icon_images.append(tk.PhotoImage(file=p))
+                    except Exception:
+                        pass
+            if not _cached_icon_images:
+                p = get_asset_path("icon.png")
+                if os.path.exists(p):
+                    _cached_icon_images.append(tk.PhotoImage(file=p))
+
+        if _cached_icon_images and hasattr(window, "iconphoto"):
+            window.iconphoto(True, *_cached_icon_images)
     except Exception:
         pass
 
