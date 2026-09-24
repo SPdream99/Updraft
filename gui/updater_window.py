@@ -54,8 +54,8 @@ class UpdaterMainWindow(tk.Tk):
         proj_title = self.config.project_name or os.path.basename(self.project_dir)
         mode_str = "Managed" if self.is_managed else "Standalone"
         self.title(f"{proj_title} - Updater ({mode_str})")
-        self.geometry("540x570")
-        self.minsize(500, 520)
+        self.geometry("540x620")
+        self.minsize(500, 560)
         self.resizable(False, False)
 
         apply_win7_theme(self)
@@ -164,7 +164,16 @@ class UpdaterMainWindow(tk.Tk):
         )
         self.btn_run_script.pack(fill="x", pady=4, ipady=3)
 
-        # Button 5: Update Updraft (Self Update)
+        # Button 5: Create Shortcuts
+        self.btn_create_shortcuts = ttk.Button(
+            btn_group,
+            text="Create Shortcuts",
+            style="Large.TButton",
+            command=self._on_create_shortcuts
+        )
+        self.btn_create_shortcuts.pack(fill="x", pady=4, ipady=3)
+
+        # Button 6: Update Updraft (Self Update)
         self.btn_update_self = ttk.Button(
             btn_group,
             text=f"Update Updraft ({APP_VERSION})",
@@ -173,7 +182,7 @@ class UpdaterMainWindow(tk.Tk):
         )
         self.btn_update_self.pack(fill="x", pady=4, ipady=3)
 
-        # Button 6: Close
+        # Button 7: Close
         self.btn_close = ttk.Button(
             btn_group,
             text="Close",
@@ -384,6 +393,7 @@ class UpdaterMainWindow(tk.Tk):
         self.btn_exclude_file.config(state=state)
         self.btn_settings.config(state=state)
         self.btn_run_script.config(state=state)
+        self.btn_create_shortcuts.config(state=state)
         self.btn_update_self.config(state=state)
         self.btn_close.config(state=state)
 
@@ -475,3 +485,42 @@ class UpdaterMainWindow(tk.Tk):
 
     def _on_settings(self):
         SettingsDialog(self, self.config, on_save_callback=self._refresh_info_labels)
+
+    def _on_create_shortcuts(self):
+        self.config.load()
+        if not getattr(self.config, "create_shortcuts", True):
+            enable = messagebox.askyesno(
+                "Shortcut Creation Disabled",
+                "Shortcut creation is currently disabled in Settings for this project.\n\n"
+                "Would you like to enable it and create shortcuts now?",
+                parent=self
+            )
+            if not enable:
+                return
+            self.config.create_shortcuts = True
+            self.config.save()
+
+        self.lbl_status.config(text="Creating shortcuts...", foreground=ACCENT_BLUE)
+        self.update_idletasks()
+
+        try:
+            created = self.engine.create_shortcuts()
+            if created:
+                count = len(created)
+                msg = f"Successfully created {count} shortcut/launcher file(s) in the project directory:\n\n"
+                sample = "\n".join(f"• {os.path.basename(p)}" for p in created[:8])
+                if count > 8:
+                    sample += f"\n...and {count - 8} more."
+                msg += sample
+                messagebox.showinfo("Shortcuts Created", msg, parent=self)
+                self.lbl_status.config(text=f"Created {count} shortcut(s)", foreground=SUCCESS_GREEN)
+            else:
+                messagebox.showinfo(
+                    "No Shortcuts Created",
+                    "No executable files, HTML documents, or Python scripts were found to create shortcuts for within the configured subfolder depth.",
+                    parent=self
+                )
+                self.lbl_status.config(text="Ready", foreground=MUTED_TEXT)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create shortcuts:\n{e}", parent=self)
+            self.lbl_status.config(text="Shortcut creation failed", foreground="#D83B01")

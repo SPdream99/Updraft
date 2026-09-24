@@ -80,6 +80,7 @@ From here:
 - **Exclude-File** — browse files in `main/` and mark any file to be skipped during updates. Excluded files can also be updated individually.
 - **Setting** — toggle post-download options, startup updates, app self-updates, and shortcut creation folder depth.
 - **Run bat script** — execute `update-done.bat` in a visible terminal, starting in `main/`.
+- **Create Shortcuts** — generate or regenerate Windows shortcuts and launcher scripts in the project folder according to configured folder depth limits.
 
 ---
 
@@ -105,7 +106,7 @@ Monitor, check, and update all managed Git installations across your PC from one
 </p>
 
 - Supports one-click **Check All Updates** and **Update All**.
-- Per-project actions: Check, Update, Exclude Files, Settings, Run Script, or Open Folder.
+- Per-project actions: Check, Update, Exclude Files, Settings, Run Script, Create Shortcuts, or Open Folder.
 
 ---
 

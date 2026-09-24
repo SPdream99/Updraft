@@ -36,8 +36,8 @@ class UpdateManagerWindow(tk.Tk):
         self.registry = ManagedRegistry()
 
         self.title("Update Manager")
-        self.geometry("940x600")
-        self.minsize(820, 500)
+        self.geometry("980x600")
+        self.minsize(860, 500)
 
         apply_win7_theme(self)
 
@@ -142,6 +142,9 @@ class UpdateManagerWindow(tk.Tk):
 
         self.btn_run_script_sel = ttk.Button(btn_box, text="Run Bat Script", command=self._on_run_script_selected, state="disabled")
         self.btn_run_script_sel.pack(side="left", padx=(0, 6))
+
+        self.btn_shortcuts_sel = ttk.Button(btn_box, text="Create Shortcuts", command=self._on_shortcuts_selected, state="disabled")
+        self.btn_shortcuts_sel.pack(side="left", padx=(0, 6))
 
         self.btn_open_folder = ttk.Button(btn_box, text="Open Folder", command=self._on_open_folder, state="disabled")
         self.btn_open_folder.pack(side="left", padx=(0, 6))
@@ -249,6 +252,7 @@ class UpdateManagerWindow(tk.Tk):
         self.btn_exclude_sel.config(state=state)
         self.btn_settings_sel.config(state=state)
         self.btn_run_script_sel.config(state=state)
+        self.btn_shortcuts_sel.config(state=state)
         self.btn_open_folder.config(state="normal" if path else "disabled")
         self.btn_remove_sel.config(state="normal" if path else "disabled")
 
@@ -325,6 +329,43 @@ class UpdateManagerWindow(tk.Tk):
         path = self._get_selected_path()
         if path and os.path.exists(path):
             run_done_script(path)
+
+    def _on_shortcuts_selected(self):
+        path = self._get_selected_path()
+        if not path or not os.path.exists(path):
+            return
+        config = UpdaterConfig(path)
+        if not getattr(config, "create_shortcuts", True):
+            enable = messagebox.askyesno(
+                "Shortcut Creation Disabled",
+                f"Shortcut creation is currently disabled in Settings for '{config.project_name or os.path.basename(path)}'.\n\n"
+                "Would you like to enable it and create shortcuts now?",
+                parent=self
+            )
+            if not enable:
+                return
+            config.create_shortcuts = True
+            config.save()
+
+        try:
+            engine = UpdateEngine(path)
+            created = engine.create_shortcuts()
+            if created:
+                count = len(created)
+                msg = f"Successfully created {count} shortcut/launcher file(s) for '{config.project_name or os.path.basename(path)}':\n\n"
+                sample = "\n".join(f"• {os.path.basename(p)}" for p in created[:8])
+                if count > 8:
+                    sample += f"\n...and {count - 8} more."
+                msg += sample
+                messagebox.showinfo("Shortcuts Created", msg, parent=self)
+            else:
+                messagebox.showinfo(
+                    "No Shortcuts Created",
+                    f"No matching executable, HTML, or Python files were found to create shortcuts for in '{config.project_name or os.path.basename(path)}' within the configured subfolder depth.",
+                    parent=self
+                )
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create shortcuts:\n{e}", parent=self)
 
     def _on_global_settings(self):
         g_settings = self.registry.get_global_settings()
