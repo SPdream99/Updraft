@@ -18,16 +18,15 @@
 
 ---
 
-
 ## What it does
 
 Updraft ships as three separate executables:
 
 **SimpleUpdater.exe** — The standalone version. It lives inside your project folder and reads its configuration from a local `updater-info.ini` file. No installation required, no external dependencies.
 
-**ManagedUpdater.exe** — The managed version. It works identically to the standalone version but also registers itself with a central registry in `%APPDATA%\Updraft`. This allows the Update Manager to track and manage it.
+**ManagedUpdater.exe** — The managed version. It works identically to the standalone version but also registers itself with a central registry in `%APPDATA%\SimpleUpdater`. This allows the Update Manager to track and manage it.
 
-**UpdateManager.exe** — A central dashboard for all managed instances. From a single window, you can check for updates, update all projects at once, manage file exclusions, and adjust per-project or global settings.
+**UpdateManager.exe** — A central dashboard for all managed instances. From a single window, you can check for updates, update all projects at once, manage file exclusions, customize project shortcuts, and adjust per-project or global settings.
 
 ---
 
@@ -45,12 +44,14 @@ When launched in a folder without an existing configuration, the updater opens a
    - Open 'main' folder when done.
    - Delete temporary compressed archives.
    - Run script on completion (`update-done.bat`).
-   - Create shortcuts for executables, links, and Python scripts with configurable subfolder depth:
-     - Root level only (`main/`)
-     - Up to 1 level of subfolders (`main/*`)
-     - Up to 2 levels of subfolders (`main/*/*`)
-     - Up to 3 levels of subfolders (`main/*/*/*`)
-     - All subfolder levels (Unlimited)
+   - Create shortcuts for executables, links, Python scripts, and subfolders:
+     - Include shortcuts to subfolders (e.g., `saves/`, `docs/`, `config/`)
+     - Configurable subfolder depth:
+       - Root level only (`main/`)
+       - Up to 1 level of subfolders (`main/*`) (Recommended default)
+       - Up to 2 levels of subfolders (`main/*/*`)
+       - Up to 3 levels of subfolders (`main/*/*/*`)
+       - All subfolder levels (Unlimited)
 
 <p align="center">
   <img src="docs/images/install_wizard_step1.png" alt="Setup Wizard - Repository URL" width="48%">
@@ -61,7 +62,7 @@ The updater then:
 - Creates a project folder named after the repository.
 - Downloads and extracts files into a `main/` subdirectory with no extra nesting.
 - Generates a blank `update-done.bat` for post-update automation.
-- Creates Windows shortcuts (`.lnk`) or `.bat` launchers for executables, HTML documents, and Python scripts based on your chosen folder depth.
+- Creates Windows shortcuts (`.lnk`), folder shortcuts, or `.bat` launchers based on your selected preferences.
 - Saves configuration to `updater-info.ini`.
 
 ---
@@ -77,10 +78,10 @@ The updater opens directly to the dashboard and displays the current version.
 From here:
 
 - **Check for Update** — queries GitHub for a newer release or commit. Shows a comparison before downloading. Preserves excluded files.
-- **Exclude-File** — browse files in `main/` and mark any file to be skipped during updates. Excluded files can also be updated individually.
-- **Setting** — toggle post-download options, startup updates, app self-updates, and shortcut creation folder depth.
+- **Exclude-File** — browse files in `main/`, search, filter, and mark files to be protected from updates.
+- **Setting** — toggle post-download options, startup updates, app self-updates, subfolder depth, and access shortcut customization.
 - **Run bat script** — execute `update-done.bat` in a visible terminal, starting in `main/`.
-- **Create Shortcuts** — generate or regenerate Windows shortcuts and launcher scripts in the project folder according to configured folder depth limits.
+- **Create Shortcuts** — generate or regenerate Windows shortcuts, folder shortcuts, and launcher scripts in the project folder or dedicated `Shortcuts/` directory.
 
 ---
 
@@ -98,6 +99,20 @@ Protect local configurations, save files, or custom scripts from being overwritt
 - **View modes**: Switch between Hierarchical Folder Tree and Flat List view.
 - **Batch operations**: One-click actions to Exclude All Filtered, Include All Filtered, or Invert Filtered Selection.
 - **Individual updates**: Update a single protected file from the repository when a newer version is available.
+
+---
+
+### Shortcut and launcher customizer
+
+Updraft provides an intelligent shortcut engine tailored for each individual project:
+
+- **Subfolder shortcuts**: Creates Windows folder shortcuts (`.lnk`) for subdirectories within `main/` (e.g., `saves/`, `docs/`, `config/`), letting you jump straight into project directories with one click.
+- **Python script launchers**: Instead of raw shortcuts, Python scripts (`.py`, `.pyw`) are wrapped in `.bat` launchers that automatically detect `python` or `py`, change to the script directory, and keep the command prompt open upon error.
+- **Noise directory filtering**: Automatically skips non-essential directories such as `.git`, `__pycache__`, `venv`, `node_modules`, `build`, and `dist`.
+- **Per-project personalization**:
+  - Choose layout: place shortcuts directly in the project root or in a dedicated `Shortcuts/` subfolder.
+  - Set a custom shortcut prefix (e.g., `Run ` or the project name).
+  - Open the **Customize Shortcuts** dialog to selectively toggle any candidate and assign custom display names.
 
 ---
 
@@ -132,7 +147,7 @@ Updraft can automatically check and update your managed projects in the backgrou
 
 Updraft executables (`SimpleUpdater.exe`, `ManagedUpdater.exe`, and `UpdateManager.exe`) can update themselves directly:
 
-- **Dedicated update button**: Click **Update Updraft (v1.0.0)** in the main updater or manager dashboard toolbar to immediately check for newer releases.
+- **Dedicated update button**: Click **Update Updraft (v1.1.0)** in the main updater or manager dashboard toolbar to immediately check for newer releases.
 - **Update all instances via Update Manager**: When updating Updraft through Update Manager, it updates `UpdateManager.exe` and automatically distributes the new `ManagedUpdater.exe` binary across all registered project directories on your machine.
 - **Automatic update on launch**: When enabled (default: on), the application checks GitHub in the background upon launch and alerts you if a newer version is available with one-click installation.
 - **Seamless binary replacement**: Since Windows locks running executables, Updraft stages the downloaded binary, coordinates a clean handoff through a detached helper, swaps the executable, and automatically restarts the new version.
@@ -156,6 +171,7 @@ If no match can be found — for example, when a maintainer completely renames a
 
 ```
 updraft/
+├── assets/                 # Multi-resolution icons, logo, and header graphics
 ├── core/
 │   ├── asset_matcher.py    # Smart release asset matching algorithm
 │   ├── config.py           # updater-info.ini and AppData registry
@@ -167,13 +183,14 @@ updraft/
 │   └── version.py          # Application metadata and version definitions
 ├── gui/
 │   ├── asset_picker_dialog.py  # Fallback asset picker when filenames change
-│   ├── exclude_window.py       # File exclusion tree view
+│   ├── exclude_window.py       # File exclusion manager (search, filter, sort)
 │   ├── install_wizard.py       # First-run setup wizard
 │   ├── manager_window.py       # Update Manager central dashboard
 │   ├── settings_window.py      # Settings dialog
+│   ├── shortcut_dialog.py      # Shortcut customizer and preview dialog
 │   └── updater_window.py       # Main updater dashboard
 ├── tests/
-│   └── test_all.py         # Unit and integration tests
+│   └── test_all.py         # Unit and integration tests (34 tests)
 ├── build.py                # PyInstaller build script
 ├── standalone_updater.py   # Entry point: SimpleUpdater.exe
 ├── managed_updater.py      # Entry point: ManagedUpdater.exe
@@ -188,7 +205,7 @@ Requires Python 3.13+ and PyInstaller.
 
 Install dependencies:
 ```
-pip install requests pyinstaller pywin32
+pip install requests pyinstaller pywin32 pillow
 ```
 
 Build all three executables:
@@ -221,7 +238,7 @@ python -m unittest discover -s tests
 - Antigravity contributed to the development of this app.
 - The `update-done.bat` file is created blank on first install. Edit it to run any post-update commands (rebuild steps, restart scripts, etc.).
 - The `main/` folder and `updater-info.ini` are excluded from version control by default. Do not delete `updater-info.ini` unless you want to re-run the setup wizard.
-- Shortcuts: Automatically discovers executables (`.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, etc.), Python scripts (`.py`, `.pyw`), web/document links (`.html`, `.htm`, `.url`), and subfolders (e.g. saves, docs, tools) up to the configured folder depth (default: up to 1 level of subfolders). Subfolder shortcuts open directly in Windows Explorer. Python scripts are wrapped in launcher `.bat` files that auto-detect python/py and pause on errors. Each project can personalize shortcut rules, prefixes, and target folder layout (project root or dedicated `Shortcuts/` folder) via the Shortcut Customizer dialog.
+- Shortcuts: Automatically discovers executables (`.exe`, `.bat`, `.cmd`, `.ps1`, `.vbs`, etc.), Python scripts (`.py`, `.pyw`), web/document links (`.html`, `.htm`, `.url`), and subfolders (e.g. `saves/`, `docs/`, `config/`) up to the configured folder depth (default: up to 1 level of subfolders). Subfolder shortcuts open directly in Windows Explorer. Python scripts are wrapped in launcher `.bat` files that auto-detect python/py and pause on errors. Each project can personalize shortcut rules, prefixes, and target folder layout (project root or dedicated `Shortcuts/` folder) via the Shortcut Customizer dialog.
 
 ---
 
