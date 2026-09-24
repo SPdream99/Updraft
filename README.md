@@ -110,6 +110,7 @@ Updraft can automatically check and update your managed projects in the backgrou
 - **How to enable**:
   - In `UpdateManager.exe`, click **Global Settings**, check **Check and update all managed projects on Windows startup**, and click **Save and Close**.
   - Individual projects can opt out of startup updates via their respective **Settings** dialog.
+- **Updraft self-update on startup**: The background startup runner also checks for Updraft releases. When a new version is detected, it automatically updates all registered `ManagedUpdater.exe` instances and stages `UpdateManager.exe` cleanly without disruptive window popups.
 
 ---
 
@@ -118,6 +119,7 @@ Updraft can automatically check and update your managed projects in the backgrou
 Updraft executables (`SimpleUpdater.exe`, `ManagedUpdater.exe`, and `UpdateManager.exe`) can update themselves directly:
 
 - **Dedicated update button**: Click **Update Updraft (v1.0.0)** in the main updater or manager dashboard toolbar to immediately check for newer releases.
+- **Update all instances via Update Manager**: When updating Updraft through Update Manager, it updates `UpdateManager.exe` and automatically distributes the new `ManagedUpdater.exe` binary across all registered project directories on your machine.
 - **Automatic update on launch**: When enabled (default: on), the application checks GitHub in the background upon launch and alerts you if a newer version is available with one-click installation.
 - **Seamless binary replacement**: Since Windows locks running executables, Updraft stages the downloaded binary, coordinates a clean handoff through a detached helper, swaps the executable, and automatically restarts the new version.
 - **Configurable**: Toggle application self-updates on or off in the **Settings** dialog.

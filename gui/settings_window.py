@@ -108,9 +108,14 @@ class SettingsDialog(tk.Toplevel):
         self.chk_startup.pack(anchor="w", pady=(4, 5))
 
         self.var_self_update = tk.BooleanVar(value=getattr(self.config, "auto_update_self", True))
+        self_update_text = (
+            "Auto-update Updraft and all managed instances when a new release is available"
+            if self.is_global
+            else "Auto-update Updraft app when a new release is available"
+        )
         self.chk_self_update = ttk.Checkbutton(
             group,
-            text="Auto-update Updraft app when a new release is available",
+            text=self_update_text,
             variable=self.var_self_update
         )
         self.chk_self_update.pack(anchor="w", pady=(4, 4))

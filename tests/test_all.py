@@ -403,7 +403,81 @@ class TestSelfUpdater(unittest.TestCase):
             self.assertEqual(res.get("latest_version"), "v9.9.9")
             self.assertEqual(res.get("asset_url"), "https://github.com/SPdream99/Updraft/releases/download/v9.9.9/SimpleUpdater.exe")
 
+    def test_update_all_managed_instances(self):
+        from core.self_updater import update_all_managed_instances
+        from unittest.mock import patch, MagicMock
+
+        # Create 2 mock project directories
+        proj1 = os.path.join(self.temp_dir, "proj1")
+        proj2 = os.path.join(self.temp_dir, "proj2")
+        os.makedirs(proj1)
+        os.makedirs(proj2)
+
+        exe1 = os.path.join(proj1, "ManagedUpdater.exe")
+        exe2 = os.path.join(proj2, "ManagedUpdater.exe")
+        with open(exe1, "w") as f:
+            f.write("old_binary_1")
+        with open(exe2, "w") as f:
+            f.write("old_binary_2")
+
+        reg = ManagedRegistry()
+        reg.registry_path = os.path.join(self.temp_dir, "test_managed.json")
+        reg.data = {"instances": {}, "global_settings": {}}
+        reg.register_instance(proj1, exe1, "Project1")
+        reg.register_instance(proj2, exe2, "Project2")
+
+        fake_assets = [
+            {
+                "name": "ManagedUpdater.exe",
+                "download_url": "https://fake.url/ManagedUpdater.exe"
+            }
+        ]
+
+        mock_resp = MagicMock()
+        mock_resp.headers = {"Content-Length": "10"}
+        mock_resp.read.side_effect = [b"new_binary", b""]
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch("core.self_updater.urllib.request.urlopen", return_value=mock_resp):
+            res = update_all_managed_instances(fake_assets, registry=reg)
+            self.assertEqual(res["updated_count"], 2)
+            self.assertEqual(res["total"], 2)
+            self.assertEqual(len(res["errors"]), 0)
+
+            with open(exe1, "rb") as f:
+                self.assertEqual(f.read(), b"new_binary")
+            with open(exe2, "rb") as f:
+                self.assertEqual(f.read(), b"new_binary")
+
+    def test_startup_with_self_update_enabled(self):
+        from core.startup import run_startup_update_all
+        from unittest.mock import patch
+
+        reg = ManagedRegistry()
+        reg.registry_path = os.path.join(self.temp_dir, "test_managed.json")
+        reg.save_global_settings(True, True, True, auto_update_on_startup=True, auto_update_self=True)
+
+        fake_upd_res = {
+            "has_update": True,
+            "latest_version": "v2.0.0",
+            "asset_url": "https://fake.url/UpdateManager.exe",
+            "all_assets": [
+                {"name": "ManagedUpdater.exe", "download_url": "https://fake.url/ManagedUpdater.exe"}
+            ]
+        }
+
+        log_path = os.path.join(self.temp_dir, "startup.log")
+        with patch("core.self_updater.check_app_update", return_value=fake_upd_res), \
+             patch("core.self_updater.update_all_managed_instances", return_value={"updated_count": 0, "total": 0, "errors": []}):
+            results = run_startup_update_all(registry=reg, log_file=log_path)
+            self.assertEqual(results.get("updated_updraft"), "v2.0.0")
+            self.assertTrue(os.path.exists(log_path))
+            with open(log_path, "r", encoding="utf-8") as f:
+                log_content = f.read()
+                self.assertIn("New Updraft release detected: v2.0.0", log_content)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

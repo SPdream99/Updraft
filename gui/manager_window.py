@@ -24,7 +24,7 @@ from core.theme import (
 )
 from core.asset_matcher import match_release_assets
 from core.version import APP_VERSION, APP_NAME
-from core.self_updater import check_app_update, perform_app_self_update
+from core.self_updater import check_app_update, perform_app_self_update, update_all_managed_instances
 from gui.asset_picker_dialog import AssetPickerDialog
 from gui.exclude_window import ExcludeFilesDialog
 from gui.settings_window import SettingsDialog
@@ -619,16 +619,27 @@ class UpdateManagerWindow(tk.Tk):
                 if res.get("has_update"):
                     latest = res["latest_version"]
                     url = res.get("asset_url")
+                    all_assets = res.get("all_assets", [])
+                    inst_count = len(self.registry.get_all_instances())
 
                     def prompt_and_update():
-                        confirm = messagebox.askyesno(
-                            "Updraft Update Available",
-                            f"A new version of Updraft is available!\n\n"
-                            f"Current Version: {APP_VERSION}\n"
-                            f"Latest Version:  {latest}\n\n"
-                            f"Do you want to download and install this update now?",
-                            parent=self
-                        )
+                        if inst_count > 0:
+                            msg = (
+                                f"A new version of Updraft is available!\n\n"
+                                f"Current Version: {APP_VERSION}\n"
+                                f"Latest Version:  {latest}\n\n"
+                                f"This will update UpdateManager and all {inst_count} managed updater instance(s) across your projects.\n\n"
+                                f"Do you want to download and install this update now?"
+                            )
+                        else:
+                            msg = (
+                                f"A new version of Updraft is available!\n\n"
+                                f"Current Version: {APP_VERSION}\n"
+                                f"Latest Version:  {latest}\n\n"
+                                f"Do you want to download and install this update now?"
+                            )
+
+                        confirm = messagebox.askyesno("Updraft Update Available", msg, parent=self)
                         if confirm:
                             if not url:
                                 messagebox.showwarning(
@@ -637,12 +648,12 @@ class UpdateManagerWindow(tk.Tk):
                                     parent=self
                                 )
                                 return
-                            self._start_app_update(url)
+                            self._start_app_update(all_assets, url, latest)
 
                     self.after(0, prompt_and_update)
                 else:
                     if not silent:
-                        msg = f"Updraft is currently up to date ({APP_VERSION})."
+                        msg = f"Updraft and all managed instances are currently up to date ({APP_VERSION})."
                         self.after(0, lambda: messagebox.showinfo("Updraft Up to Date", msg, parent=self))
             except Exception as e:
                 if not silent:
@@ -652,15 +663,32 @@ class UpdateManagerWindow(tk.Tk):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _start_app_update(self, download_url: str):
-        self.lbl_status.config(text="Downloading Updraft update...", foreground=ACCENT_BLUE)
-
-        def prog(pct):
-            self.after(0, lambda: self.lbl_status.config(text=f"Downloading Updraft update... {int(pct * 100)}%", foreground=ACCENT_BLUE))
+    def _start_app_update(self, all_assets: list, manager_url: str, latest_version: str):
+        self.lbl_status.config(text="Updating Updraft suite...", foreground=ACCENT_BLUE)
 
         def worker():
             try:
-                perform_app_self_update(download_url, self.updater_exe_path, progress_callback=prog)
+                # 1. Update all ManagedUpdater instances
+                inst_count = len(self.registry.get_all_instances())
+                updated_inst = 0
+                if inst_count > 0:
+                    self.after(0, lambda: self.lbl_status.config(text="Updating managed project instances...", foreground=ACCENT_BLUE))
+                    inst_res = update_all_managed_instances(all_assets, registry=self.registry)
+                    updated_inst = inst_res.get("updated_count", 0)
+
+                # 2. Download and self-update UpdateManager.exe
+                def prog(pct):
+                    self.after(0, lambda: self.lbl_status.config(text=f"Downloading UpdateManager.exe... {int(pct * 100)}%", foreground=ACCENT_BLUE))
+
+                perform_app_self_update(manager_url, self.updater_exe_path, progress_callback=prog, restart=True)
+
+                # If running in development (not frozen), perform_app_self_update returns cleanly
+                self.after(0, lambda: messagebox.showinfo(
+                    "Update Complete",
+                    f"Updraft update complete!\n\nUpdated {updated_inst} managed project instance(s) and staged {latest_version}.",
+                    parent=self
+                ))
+                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Self-Update Error", f"Failed to perform self-update:\n{e}", parent=self))
                 self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
