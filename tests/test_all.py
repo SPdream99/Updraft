@@ -132,8 +132,34 @@ class TestDownloaderAndEngine(unittest.TestCase):
         self.assertTrue(is_executable("job.wsf"))
         self.assertTrue(is_executable("index.html"))
         self.assertTrue(is_executable("page.htm"))
+        self.assertTrue(is_executable("app.py"))
+        self.assertTrue(is_executable("gui.pyw"))
         self.assertFalse(is_executable("data.json"))
         self.assertFalse(is_executable("readme.md"))
+
+    def test_create_shortcuts_with_python_bat(self):
+        # Create dummy python files and __init__.py in main
+        os.makedirs(self.engine.main_dir, exist_ok=True)
+        py_file = os.path.join(self.engine.main_dir, "launcher.py")
+        init_file = os.path.join(self.engine.main_dir, "__init__.py")
+        with open(py_file, "w") as f:
+            f.write("print('hello')\n")
+        with open(init_file, "w") as f:
+            f.write("# init\n")
+
+        self.engine.create_shortcuts()
+
+        # Should generate launcher.bat in project root
+        bat_file = os.path.join(self.engine.project_dir, "launcher.bat")
+        self.assertTrue(os.path.exists(bat_file))
+        with open(bat_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn('python "launcher.py"', content)
+        self.assertIn('cd /d "%~dp0main"', content)
+
+        # __init__.py should NOT get a bat file
+        init_bat = os.path.join(self.engine.project_dir, "__init__.bat")
+        self.assertFalse(os.path.exists(init_bat))
 
     def test_archive_extraction_and_install_with_exclusions(self):
         # Create a mock zip archive

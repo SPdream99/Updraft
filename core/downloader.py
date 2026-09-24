@@ -29,12 +29,43 @@ EXECUTABLE_EXTENSIONS = {
     ".msc",
     ".html",
     ".htm",
+    ".py",
+    ".pyw",
 }
 
 
 def is_executable(filename: str) -> bool:
     _, ext = os.path.splitext(filename)
     return ext.lower() in EXECUTABLE_EXTENSIONS
+
+
+def create_python_bat_launcher(target_py_path: str, bat_path: str, rel_dir: Optional[str] = None):
+    """
+    Creates a .bat launcher in the project root to run a Python script (.py/.pyw) with Python.
+    """
+    py_filename = os.path.basename(target_py_path)
+    if rel_dir and rel_dir != ".":
+        win_rel_dir = rel_dir.replace("/", "\\")
+        cd_line = f'cd /d "%~dp0{win_rel_dir}"'
+    else:
+        cd_line = 'cd /d "%~dp0"'
+
+    bat_content = f"""@echo off
+chcp 65001 >nul
+{cd_line}
+where python >nul 2>nul
+if %errorlevel% equ 0 (
+    python "{py_filename}" %*
+) else (
+    py "{py_filename}" %*
+)
+if errorlevel 1 pause
+"""
+    try:
+        with open(bat_path, "w", encoding="utf-8") as f:
+            f.write(bat_content)
+    except Exception as e:
+        print(f"Warning: Failed to create python bat launcher for {target_py_path}: {e}")
 
 
 def create_windows_shortcut(target_path: str, shortcut_path: str, working_dir: Optional[str] = None):
@@ -257,26 +288,43 @@ class UpdateEngine:
 
     def create_shortcuts(self):
         """
-        Creates Windows shortcuts (.lnk) in the project directory for any
-        executables or scripts (.exe, .bat, .cmd, .ps1, .vbs, etc.) found inside main/.
+        Creates Windows shortcuts (.lnk) or .bat launchers in the project directory for any
+        executables, scripts, HTML, or Python files found inside main/.
+        Python scripts (.py/.pyw) are wrapped in .bat launchers so they run with python instead of a normal shortcut.
         """
         if not os.path.exists(self.main_dir):
             return
 
-        for root, _, files in os.walk(self.main_dir):
+        for root, dirs, files in os.walk(self.main_dir):
+            # Exclude hidden directories and python caches
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
             for file in files:
+                if file.startswith("__"):
+                    continue
                 if is_executable(file):
                     target_file = os.path.join(root, file)
                     base_name, ext = os.path.splitext(file)
-                    shortcut_name = f"{base_name}.lnk"
-                    shortcut_path = os.path.join(self.project_dir, shortcut_name)
+                    ext_lower = ext.lower()
 
-                    # If multiple files share the same base name, prevent overwrite by appending extension
-                    if os.path.exists(shortcut_path):
-                        shortcut_name = f"{base_name} ({ext.lstrip('.')}).lnk"
+                    if ext_lower in {".py", ".pyw"}:
+                        bat_name = f"{base_name}.bat"
+                        bat_path = os.path.join(self.project_dir, bat_name)
+                        if os.path.exists(bat_path):
+                            bat_name = f"{base_name} (py).bat"
+                            bat_path = os.path.join(self.project_dir, bat_name)
+
+                        rel_dir = os.path.relpath(root, self.project_dir)
+                        create_python_bat_launcher(target_file, bat_path, rel_dir)
+                    else:
+                        shortcut_name = f"{base_name}.lnk"
                         shortcut_path = os.path.join(self.project_dir, shortcut_name)
 
-                    create_windows_shortcut(target_file, shortcut_path, working_dir=os.path.dirname(target_file))
+                        # If multiple files share the same base name, prevent overwrite by appending extension
+                        if os.path.exists(shortcut_path):
+                            shortcut_name = f"{base_name} ({ext.lstrip('.')}).lnk"
+                            shortcut_path = os.path.join(self.project_dir, shortcut_name)
+
+                        create_windows_shortcut(target_file, shortcut_path, working_dir=os.path.dirname(target_file))
 
     def open_main_folder(self):
         """Opens the main folder in Windows Explorer."""
