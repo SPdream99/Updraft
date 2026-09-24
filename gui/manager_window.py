@@ -339,6 +339,8 @@ class UpdateManagerWindow(tk.Tk):
                 self.run_script_after_update = s.get("run_script_after_update", False)
                 self.auto_update_on_startup = s.get("auto_update_on_startup", False)
                 self.auto_update_self = s.get("auto_update_self", True)
+                self.create_shortcuts = s.get("create_shortcuts", True)
+                self.shortcut_folder_level = s.get("shortcut_folder_level", -1)
                 self.project_name = "Global Settings"
 
             def save(self):
@@ -347,7 +349,9 @@ class UpdateManagerWindow(tk.Tk):
                     self.delete_compressed,
                     self.run_script_after_update,
                     self.auto_update_on_startup,
-                    self.auto_update_self
+                    self.auto_update_self,
+                    self.create_shortcuts,
+                    self.shortcut_folder_level
                 )
 
         mock = MockGlobalConfig(self.registry)

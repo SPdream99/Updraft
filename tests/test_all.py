@@ -35,6 +35,8 @@ class TestConfig(unittest.TestCase):
         cfg.open_when_done = True
         cfg.delete_compressed = False
         cfg.run_script_after_update = True
+        cfg.create_shortcuts = False
+        cfg.shortcut_folder_level = 2
         cfg.save()
 
         self.assertTrue(cfg.exists())
@@ -56,6 +58,8 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(cfg2.open_when_done)
         self.assertFalse(cfg2.delete_compressed)
         self.assertTrue(cfg2.run_script_after_update)
+        self.assertFalse(cfg2.create_shortcuts)
+        self.assertEqual(cfg2.shortcut_folder_level, 2)
 
     def test_excluded_files(self):
         cfg = UpdaterConfig(self.test_dir)
@@ -233,11 +237,19 @@ class TestManagedRegistry(unittest.TestCase):
         self.assertEqual(inst["version_name"], "v1.0")
 
         # Test global settings
-        self.registry.save_global_settings(open_when_done=False, delete_compressed=True, run_script_after_update=True)
+        self.registry.save_global_settings(
+            open_when_done=False,
+            delete_compressed=True,
+            run_script_after_update=True,
+            create_shortcuts=False,
+            shortcut_folder_level=1
+        )
         g = self.registry.get_global_settings()
         self.assertFalse(g["open_when_done"])
         self.assertTrue(g["delete_compressed"])
         self.assertTrue(g["run_script_after_update"])
+        self.assertFalse(g["create_shortcuts"])
+        self.assertEqual(g["shortcut_folder_level"], 1)
 
         # Test removal
         self.registry.remove_instance(proj_dir)
@@ -505,7 +517,91 @@ class TestSelfUpdater(unittest.TestCase):
                 self.assertIn("New Updraft release detected: v2.0.0", log_content)
 
 
+class TestShortcutCreation(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.engine = UpdateEngine(self.test_dir)
+        self.cfg = UpdaterConfig(self.test_dir)
+        self.cfg.save()
+
+        # Create nested file structure inside main/
+        # main/
+        #   root_app.py
+        #   root_doc.html
+        #   level1/
+        #     sub1_app.py
+        #     sub1_doc.html
+        #     level2/
+        #       sub2_app.py
+        #       sub2_doc.html
+        main_dir = os.path.join(self.test_dir, "main")
+        l1_dir = os.path.join(main_dir, "level1")
+        l2_dir = os.path.join(l1_dir, "level2")
+        os.makedirs(l2_dir, exist_ok=True)
+
+        with open(os.path.join(main_dir, "root_app.py"), "w") as f:
+            f.write("print('root')")
+        with open(os.path.join(main_dir, "root_doc.html"), "w") as f:
+            f.write("<html>root</html>")
+
+        with open(os.path.join(l1_dir, "sub1_app.py"), "w") as f:
+            f.write("print('level1')")
+        with open(os.path.join(l1_dir, "sub1_doc.html"), "w") as f:
+            f.write("<html>sub1</html>")
+
+        with open(os.path.join(l2_dir, "sub2_app.py"), "w") as f:
+            f.write("print('level2')")
+        with open(os.path.join(l2_dir, "sub2_doc.html"), "w") as f:
+            f.write("<html>sub2</html>")
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_shortcut_disabled(self):
+        self.cfg.create_shortcuts = False
+        self.cfg.save()
+
+        shortcuts = self.engine.create_shortcuts()
+        self.assertEqual(len(shortcuts), 0)
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "root_app.bat")))
+
+    def test_shortcut_depth_0_root_only(self):
+        self.cfg.create_shortcuts = True
+        self.cfg.shortcut_folder_level = 0
+        self.cfg.save()
+
+        shortcuts = self.engine.create_shortcuts()
+        # Should only contain root items (root_app.bat)
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "root_app.bat")))
+        # Level 1 and 2 items should NOT exist
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "sub1_app.bat")))
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "sub2_app.bat")))
+
+    def test_shortcut_depth_1(self):
+        self.cfg.create_shortcuts = True
+        self.cfg.shortcut_folder_level = 1
+        self.cfg.save()
+
+        shortcuts = self.engine.create_shortcuts()
+        # Level 0 and Level 1 items should exist
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "root_app.bat")))
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "sub1_app.bat")))
+        # Level 2 items should NOT exist
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "sub2_app.bat")))
+
+    def test_shortcut_depth_unlimited(self):
+        self.cfg.create_shortcuts = True
+        self.cfg.shortcut_folder_level = -1
+        self.cfg.save()
+
+        shortcuts = self.engine.create_shortcuts()
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "root_app.bat")))
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "sub1_app.bat")))
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "sub2_app.bat")))
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

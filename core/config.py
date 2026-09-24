@@ -27,6 +27,30 @@ def get_managed_registry_path() -> str:
     return os.path.join(get_appdata_dir(), MANAGED_REGISTRY_FILENAME)
 
 
+SHORTCUT_DEPTH_OPTIONS = [
+    "Root level only (Files directly in main/)",
+    "Up to 1 level of subfolders (Level 1 and above: main/*)",
+    "Up to 2 levels of subfolders (Level 2 and above: main/*/*)",
+    "Up to 3 levels of subfolders (Level 3 and above: main/*/*/*)",
+    "All subfolder levels (Unlimited)",
+]
+
+SHORTCUT_DEPTH_MAP = {
+    "Root level only (Files directly in main/)": 0,
+    "Up to 1 level of subfolders (Level 1 and above: main/*)": 1,
+    "Up to 2 levels of subfolders (Level 2 and above: main/*/*)": 2,
+    "Up to 3 levels of subfolders (Level 3 and above: main/*/*/*)": 3,
+    "All subfolder levels (Unlimited)": -1,
+}
+
+
+def get_depth_label_from_level(level: int) -> str:
+    for label, val in SHORTCUT_DEPTH_MAP.items():
+        if val == level:
+            return label
+    return "All subfolder levels (Unlimited)"
+
+
 class UpdaterConfig:
     """
     Manages reading and writing updater-info.ini for a project.
@@ -172,6 +196,22 @@ class UpdaterConfig:
     def auto_update_self(self, value: bool):
         self.config.set("Settings", "auto_update_self", "true" if value else "false")
 
+    @property
+    def create_shortcuts(self) -> bool:
+        return self.config.getboolean("Settings", "create_shortcuts", fallback=True)
+
+    @create_shortcuts.setter
+    def create_shortcuts(self, value: bool):
+        self.config.set("Settings", "create_shortcuts", "true" if value else "false")
+
+    @property
+    def shortcut_folder_level(self) -> int:
+        return self.config.getint("Settings", "shortcut_folder_level", fallback=-1)
+
+    @shortcut_folder_level.setter
+    def shortcut_folder_level(self, value: int):
+        self.config.set("Settings", "shortcut_folder_level", str(value))
+
     # --- Excluded Files ---
     def get_excluded_files(self) -> Dict[str, Dict[str, str]]:
         """
@@ -235,6 +275,8 @@ class ManagedRegistry:
                 "run_script_after_update": False,
                 "auto_update_on_startup": False,
                 "auto_update_self": True,
+                "create_shortcuts": True,
+                "shortcut_folder_level": -1,
             }
         }
         self.load()
@@ -253,12 +295,18 @@ class ManagedRegistry:
                         "run_script_after_update": False,
                         "auto_update_on_startup": False,
                         "auto_update_self": True,
+                        "create_shortcuts": True,
+                        "shortcut_folder_level": -1,
                     }
                 else:
                     if "auto_update_on_startup" not in self.data["global_settings"]:
                         self.data["global_settings"]["auto_update_on_startup"] = False
                     if "auto_update_self" not in self.data["global_settings"]:
                         self.data["global_settings"]["auto_update_self"] = True
+                    if "create_shortcuts" not in self.data["global_settings"]:
+                        self.data["global_settings"]["create_shortcuts"] = True
+                    if "shortcut_folder_level" not in self.data["global_settings"]:
+                        self.data["global_settings"]["shortcut_folder_level"] = -1
             except Exception:
                 self.data = {
                     "instances": {},
@@ -268,6 +316,8 @@ class ManagedRegistry:
                         "run_script_after_update": False,
                         "auto_update_on_startup": False,
                         "auto_update_self": True,
+                        "create_shortcuts": True,
+                        "shortcut_folder_level": -1,
                     }
                 }
 
@@ -339,13 +389,24 @@ class ManagedRegistry:
             "auto_update_self": True,
         })
 
-    def save_global_settings(self, open_when_done: bool, delete_compressed: bool, run_script_after_update: bool = False, auto_update_on_startup: bool = False, auto_update_self: bool = True):
+    def save_global_settings(
+        self,
+        open_when_done: bool,
+        delete_compressed: bool,
+        run_script_after_update: bool = False,
+        auto_update_on_startup: bool = False,
+        auto_update_self: bool = True,
+        create_shortcuts: bool = True,
+        shortcut_folder_level: int = -1,
+    ):
         self.data["global_settings"] = {
             "open_when_done": open_when_done,
             "delete_compressed": delete_compressed,
             "run_script_after_update": run_script_after_update,
             "auto_update_on_startup": auto_update_on_startup,
             "auto_update_self": auto_update_self,
+            "create_shortcuts": create_shortcuts,
+            "shortcut_folder_level": shortcut_folder_level,
         }
         self.save()
 

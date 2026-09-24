@@ -6,7 +6,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Callable, List, Dict, Any
 
-from core.config import UpdaterConfig, ManagedRegistry
+from core.config import (
+    UpdaterConfig,
+    ManagedRegistry,
+    SHORTCUT_DEPTH_OPTIONS,
+    SHORTCUT_DEPTH_MAP,
+    get_depth_label_from_level,
+)
 from core.downloader import UpdateEngine, is_archive
 from core.git_client import GitHubClient, parse_git_url, GitRepoInfo
 from core.theme import (
@@ -40,8 +46,8 @@ class InstallWizard(tk.Tk):
 
         mode_label = "Managed Updater" if is_managed else "Simple Updater"
         self.title(f"{mode_label} - Setup & Installation Wizard")
-        self.geometry("680x580")
-        self.minsize(600, 500)
+        self.geometry("680x640")
+        self.minsize(600, 520)
 
         apply_win7_theme(self)
 
@@ -68,6 +74,8 @@ class InstallWizard(tk.Tk):
         self.var_open_done = tk.BooleanVar(value=True)
         self.var_delete_compressed = tk.BooleanVar(value=True)
         self.var_run_script = tk.BooleanVar(value=False)
+        self.var_create_shortcuts = tk.BooleanVar(value=True)
+        self.var_shortcut_depth = tk.StringVar(value=SHORTCUT_DEPTH_OPTIONS[4])
 
         self._build_ui()
         self._show_step(1)
@@ -289,7 +297,7 @@ class InstallWizard(tk.Tk):
             text="Open it when done (Open 'main' folder in Windows Explorer)",
             variable=self.var_open_done
         )
-        chk_open.pack(anchor="w", pady=(4, 8))
+        chk_open.pack(anchor="w", pady=(4, 6))
 
         chk_del = ttk.Checkbutton(
             group,
@@ -303,7 +311,28 @@ class InstallWizard(tk.Tk):
             text="Run script after update complete (Runs update-done.bat in terminal)",
             variable=self.var_run_script
         )
-        chk_script.pack(anchor="w", pady=(4, 4))
+        chk_script.pack(anchor="w", pady=(4, 6))
+
+        chk_shortcuts = ttk.Checkbutton(
+            group,
+            text="Create shortcuts for executables, links, and Python scripts",
+            variable=self.var_create_shortcuts,
+            command=self._toggle_shortcut_options
+        )
+        chk_shortcuts.pack(anchor="w", pady=(4, 4))
+
+        depth_frame = ttk.Frame(group)
+        depth_frame.pack(fill="x", padx=(24, 0), pady=(0, 4))
+
+        ttk.Label(depth_frame, text="Subfolder depth:").pack(side="left", padx=(0, 8))
+        self.cbo_shortcut_depth = ttk.Combobox(
+            depth_frame,
+            textvariable=self.var_shortcut_depth,
+            values=SHORTCUT_DEPTH_OPTIONS,
+            state="readonly" if self.var_create_shortcuts.get() else "disabled",
+            width=32
+        )
+        self.cbo_shortcut_depth.pack(side="left")
 
         summary_group = ttk.LabelFrame(self.container, text="Installation Summary", padding=(16, 12))
         summary_group.pack(fill="both", expand=True)
@@ -314,6 +343,14 @@ class InstallWizard(tk.Tk):
 
         ver = self.latest_release.get("tag_name") if self.var_update_type.get() == "release" else self.latest_commit.get("short_sha")
         ttk.Label(summary_group, text=f"Initial Version: {ver}").pack(anchor="w", pady=2)
+
+        shortcut_info = self.var_shortcut_depth.get() if self.var_create_shortcuts.get() else "Disabled"
+        ttk.Label(summary_group, text=f"Shortcuts: {shortcut_info}").pack(anchor="w", pady=2)
+
+    def _toggle_shortcut_options(self):
+        if hasattr(self, "cbo_shortcut_depth"):
+            state = "readonly" if self.var_create_shortcuts.get() else "disabled"
+            self.cbo_shortcut_depth.config(state=state)
 
     # --- STEP 4: Progress ---
     def _render_step_4_progress(self):
@@ -409,6 +446,8 @@ class InstallWizard(tk.Tk):
             config.open_when_done = self.var_open_done.get()
             config.delete_compressed = self.var_delete_compressed.get()
             config.run_script_after_update = self.var_run_script.get()
+            config.create_shortcuts = self.var_create_shortcuts.get()
+            config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), -1)
 
             # Record version information
             if config.update_type == "source":

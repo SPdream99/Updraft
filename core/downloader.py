@@ -286,18 +286,42 @@ class UpdateEngine:
             except Exception:
                 pass
 
-    def create_shortcuts(self):
+    def create_shortcuts(self) -> List[str]:
         """
         Creates Windows shortcuts (.lnk) or .bat launchers in the project directory for any
         executables, scripts, HTML, or Python files found inside main/.
         Python scripts (.py/.pyw) are wrapped in .bat launchers so they run with python instead of a normal shortcut.
+        Respects self.config.create_shortcuts and self.config.shortcut_folder_level.
         """
+        self.config.load()
+        if not getattr(self.config, "create_shortcuts", True):
+            return []
+
         if not os.path.exists(self.main_dir):
-            return
+            return []
+
+        created = []
+        max_depth = getattr(self.config, "shortcut_folder_level", -1)
 
         for root, dirs, files in os.walk(self.main_dir):
             # Exclude hidden directories and python caches
             dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
+
+            # Calculate depth relative to self.main_dir
+            rel = os.path.relpath(root, self.main_dir)
+            if rel == ".":
+                level = 0
+            else:
+                level = len(rel.replace("\\", "/").split("/"))
+
+            # If max_depth is specified and reached, don't descend into deeper subdirectories
+            if max_depth >= 0 and level >= max_depth:
+                dirs.clear()
+
+            # If current folder level is beyond max_depth, skip files
+            if max_depth >= 0 and level > max_depth:
+                continue
+
             for file in files:
                 if file.startswith("__"):
                     continue
@@ -315,6 +339,7 @@ class UpdateEngine:
 
                         rel_dir = os.path.relpath(root, self.project_dir)
                         create_python_bat_launcher(target_file, bat_path, rel_dir)
+                        created.append(bat_path)
                     else:
                         shortcut_name = f"{base_name}.lnk"
                         shortcut_path = os.path.join(self.project_dir, shortcut_name)
@@ -325,6 +350,9 @@ class UpdateEngine:
                             shortcut_path = os.path.join(self.project_dir, shortcut_name)
 
                         create_windows_shortcut(target_file, shortcut_path, working_dir=os.path.dirname(target_file))
+                        created.append(shortcut_path)
+
+        return created
 
     def open_main_folder(self):
         """Opens the main folder in Windows Explorer."""

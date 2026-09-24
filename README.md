@@ -41,7 +41,16 @@ When launched in a folder without an existing configuration, the updater opens a
 2. Choose an update source:
    - **Release Page** — select one or more release asset files to download.
    - **Source Code** — download the latest commit as a zip archive.
-3. Set completion options (open folder when done, delete archives, run script on completion).
+3. Set completion options:
+   - Open 'main' folder when done.
+   - Delete temporary compressed archives.
+   - Run script on completion (`update-done.bat`).
+   - Create shortcuts for executables, links, and Python scripts with configurable subfolder depth:
+     - Root level only (`main/`)
+     - Up to 1 level of subfolders (`main/*`)
+     - Up to 2 levels of subfolders (`main/*/*`)
+     - Up to 3 levels of subfolders (`main/*/*/*`)
+     - All subfolder levels (Unlimited)
 
 <p align="center">
   <img src="docs/images/install_wizard_step1.png" alt="Setup Wizard - Repository URL" width="48%">
@@ -52,7 +61,7 @@ The updater then:
 - Creates a project folder named after the repository.
 - Downloads and extracts files into a `main/` subdirectory with no extra nesting.
 - Generates a blank `update-done.bat` for post-update automation.
-- Creates Windows shortcuts (`.lnk`) for all executables and scripts found in `main/`.
+- Creates Windows shortcuts (`.lnk`) or `.bat` launchers for executables, HTML documents, and Python scripts based on your chosen folder depth.
 - Saves configuration to `updater-info.ini`.
 
 ---
@@ -69,7 +78,7 @@ From here:
 
 - **Check for Update** — queries GitHub for a newer release or commit. Shows a comparison before downloading. Preserves excluded files.
 - **Exclude-File** — browse files in `main/` and mark any file to be skipped during updates. Excluded files can also be updated individually.
-- **Setting** — toggle post-download options.
+- **Setting** — toggle post-download options, startup updates, app self-updates, and shortcut creation folder depth.
 - **Run bat script** — execute `update-done.bat` in a visible terminal, starting in `main/`.
 
 ---

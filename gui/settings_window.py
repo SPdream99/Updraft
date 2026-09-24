@@ -1,7 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Callable
-from core.config import UpdaterConfig
+from core.config import (
+    UpdaterConfig,
+    SHORTCUT_DEPTH_OPTIONS,
+    SHORTCUT_DEPTH_MAP,
+    get_depth_label_from_level,
+)
 from core.theme import (
     apply_win7_theme,
     create_win7_header,
@@ -27,8 +32,8 @@ class SettingsDialog(tk.Toplevel):
 
         title_text = "Global Updater Settings" if is_global else f"Settings - {config.project_name or 'Simple Updater'}"
         self.title(title_text)
-        self.geometry("500x420")
-        self.minsize(460, 360)
+        self.geometry("520x480")
+        self.minsize(460, 420)
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -75,7 +80,7 @@ class SettingsDialog(tk.Toplevel):
             text="Open it when done (Open 'main' folder after completion)",
             variable=self.var_open
         )
-        self.chk_open.pack(anchor="w", pady=(4, 5))
+        self.chk_open.pack(anchor="w", pady=(3, 4))
 
         self.var_delete = tk.BooleanVar(value=self.config.delete_compressed)
         self.chk_delete = ttk.Checkbutton(
@@ -83,7 +88,7 @@ class SettingsDialog(tk.Toplevel):
             text="Delete the compressed file when done? (Removes downloaded zip/tar)",
             variable=self.var_delete
         )
-        self.chk_delete.pack(anchor="w", pady=(4, 5))
+        self.chk_delete.pack(anchor="w", pady=(3, 4))
 
         self.var_run_script = tk.BooleanVar(value=getattr(self.config, "run_script_after_update", False))
         self.chk_run_script = ttk.Checkbutton(
@@ -91,7 +96,31 @@ class SettingsDialog(tk.Toplevel):
             text="Run script after update complete (Runs update-done.bat in terminal)",
             variable=self.var_run_script
         )
-        self.chk_run_script.pack(anchor="w", pady=(4, 5))
+        self.chk_run_script.pack(anchor="w", pady=(3, 4))
+
+        self.var_create_shortcuts = tk.BooleanVar(value=getattr(self.config, "create_shortcuts", True))
+        self.chk_create_shortcuts = ttk.Checkbutton(
+            group,
+            text="Create shortcuts for executables, links, and Python scripts",
+            variable=self.var_create_shortcuts,
+            command=self._toggle_shortcut_options
+        )
+        self.chk_create_shortcuts.pack(anchor="w", pady=(3, 2))
+
+        depth_frame = ttk.Frame(group)
+        depth_frame.pack(fill="x", padx=(24, 0), pady=(0, 4))
+
+        ttk.Label(depth_frame, text="Subfolder depth:").pack(side="left", padx=(0, 6))
+        current_level = getattr(self.config, "shortcut_folder_level", -1)
+        self.var_shortcut_depth = tk.StringVar(value=get_depth_label_from_level(current_level))
+        self.cbo_shortcut_depth = ttk.Combobox(
+            depth_frame,
+            textvariable=self.var_shortcut_depth,
+            values=SHORTCUT_DEPTH_OPTIONS,
+            state="readonly" if self.var_create_shortcuts.get() else "disabled",
+            width=28
+        )
+        self.cbo_shortcut_depth.pack(side="left")
 
         startup_val = getattr(self.config, "auto_update_on_startup", False if self.is_global else True)
         self.var_startup = tk.BooleanVar(value=startup_val)
@@ -105,7 +134,7 @@ class SettingsDialog(tk.Toplevel):
             text=startup_text,
             variable=self.var_startup
         )
-        self.chk_startup.pack(anchor="w", pady=(4, 5))
+        self.chk_startup.pack(anchor="w", pady=(3, 4))
 
         self.var_self_update = tk.BooleanVar(value=getattr(self.config, "auto_update_self", True))
         self_update_text = (
@@ -118,12 +147,19 @@ class SettingsDialog(tk.Toplevel):
             text=self_update_text,
             variable=self.var_self_update
         )
-        self.chk_self_update.pack(anchor="w", pady=(4, 4))
+        self.chk_self_update.pack(anchor="w", pady=(3, 3))
+
+    def _toggle_shortcut_options(self):
+        if hasattr(self, "cbo_shortcut_depth"):
+            state = "readonly" if self.var_create_shortcuts.get() else "disabled"
+            self.cbo_shortcut_depth.config(state=state)
 
     def _save_and_close(self):
         self.config.open_when_done = self.var_open.get()
         self.config.delete_compressed = self.var_delete.get()
         self.config.run_script_after_update = self.var_run_script.get()
+        self.config.create_shortcuts = self.var_create_shortcuts.get()
+        self.config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), -1)
         self.config.auto_update_on_startup = self.var_startup.get()
         self.config.auto_update_self = self.var_self_update.get()
         self.config.save()
