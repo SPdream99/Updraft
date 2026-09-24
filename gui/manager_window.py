@@ -80,6 +80,16 @@ class UpdateManagerWindow(tk.Tk):
         btn_global_settings = ttk.Button(toolbar, text="Global Settings", command=self._on_global_settings)
         btn_global_settings.pack(side="right")
 
+        from core.startup import is_startup_enabled
+        startup_active = is_startup_enabled()
+        self.lbl_startup_status = ttk.Label(
+            toolbar,
+            text=f"Startup Auto-Update: {'Enabled' if startup_active else 'Disabled'}",
+            font=("Segoe UI", 8),
+            foreground=SUCCESS_GREEN if startup_active else MUTED_TEXT
+        )
+        self.lbl_startup_status.pack(side="right", padx=(0, 12))
+
         sep_top = tk.Frame(self, height=1, bg=LIGHT_BORDER)
         sep_top.pack(fill="x")
 
@@ -202,6 +212,13 @@ class UpdateManagerWindow(tk.Tk):
             )
 
         self.lbl_count.config(text=f"{count} project(s) managed")
+        if hasattr(self, "lbl_startup_status"):
+            from core.startup import is_startup_enabled
+            startup_active = is_startup_enabled()
+            self.lbl_startup_status.config(
+                text=f"Startup Auto-Update: {'Enabled' if startup_active else 'Disabled'}",
+                foreground=SUCCESS_GREEN if startup_active else MUTED_TEXT
+            )
         self._on_select_item(None)
 
     def _get_selected_path(self) -> Optional[str]:
@@ -305,17 +322,19 @@ class UpdateManagerWindow(tk.Tk):
                 self.open_when_done = s.get("open_when_done", True)
                 self.delete_compressed = s.get("delete_compressed", True)
                 self.run_script_after_update = s.get("run_script_after_update", False)
+                self.auto_update_on_startup = s.get("auto_update_on_startup", False)
                 self.project_name = "Global Settings"
 
             def save(self):
                 self.reg.save_global_settings(
                     self.open_when_done,
                     self.delete_compressed,
-                    self.run_script_after_update
+                    self.run_script_after_update,
+                    self.auto_update_on_startup
                 )
 
         mock = MockGlobalConfig(self.registry)
-        SettingsDialog(self, mock, is_global=True)
+        SettingsDialog(self, mock, on_save_callback=self._refresh_list, is_global=True)
 
     # --- Update Checking & Performing ---
     def _check_project_update(self, path: str) -> Dict[str, Any]:

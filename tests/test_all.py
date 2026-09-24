@@ -99,9 +99,14 @@ class TestGitParser(unittest.TestCase):
     def test_github_client_repo_details(self):
         info = parse_git_url("https://github.com/Genymobile/scrcpy")
         client = GitHubClient(info)
-        details = client.get_repo_details()
-        self.assertEqual(details["name"].lower(), "scrcpy")
-        self.assertIn("scrcpy", details["html_url"].lower())
+        try:
+            details = client.get_repo_details()
+            self.assertEqual(details["name"].lower(), "scrcpy")
+            self.assertIn("scrcpy", details["html_url"].lower())
+        except RuntimeError as e:
+            if "403" in str(e) or "rate limit" in str(e).lower():
+                self.skipTest("GitHub API rate limit reached")
+            raise
 
 
 class TestDownloaderAndEngine(unittest.TestCase):
@@ -269,6 +274,69 @@ class TestAssetMatcher(unittest.TestCase):
         )
         self.assertEqual(len(matched), 0)
         self.assertEqual(unresolved, ["old-software-win64.zip"])
+
+
+class TestStartup(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_config_auto_update_on_startup(self):
+        cfg = UpdaterConfig(self.temp_dir)
+        # Default should be True
+        self.assertTrue(cfg.auto_update_on_startup)
+        cfg.auto_update_on_startup = False
+        cfg.save()
+
+        # Reload
+        cfg2 = UpdaterConfig(self.temp_dir)
+        self.assertFalse(cfg2.auto_update_on_startup)
+
+    def test_managed_registry_startup_setting(self):
+        reg = ManagedRegistry()
+        reg.registry_path = os.path.join(self.temp_dir, "test_managed.json")
+        reg.save_global_settings(True, True, True, auto_update_on_startup=True)
+
+        loaded = reg.get_global_settings()
+        self.assertTrue(loaded.get("auto_update_on_startup"))
+
+    def test_registry_startup_enable_disable(self):
+        import sys
+        if sys.platform != "win32":
+            self.skipTest("Windows-only startup registry test")
+
+        from core.startup import is_startup_enabled, set_startup_enabled, get_startup_command
+        test_key = "UpdraftTestEntry_UnitTest"
+
+        try:
+            # Enable with custom command
+            res = set_startup_enabled(True, entry_name=test_key, custom_command='"C:\\dummy.exe" --startup')
+            self.assertTrue(res)
+            self.assertTrue(is_startup_enabled(entry_name=test_key))
+            cmd = get_startup_command(entry_name=test_key)
+            self.assertEqual(cmd, '"C:\\dummy.exe" --startup')
+
+            # Disable
+            res = set_startup_enabled(False, entry_name=test_key)
+            self.assertTrue(res)
+            self.assertFalse(is_startup_enabled(entry_name=test_key))
+        finally:
+            # Cleanup
+            set_startup_enabled(False, entry_name=test_key)
+
+    def test_run_startup_update_all_empty(self):
+        from core.startup import run_startup_update_all
+        reg = ManagedRegistry()
+        reg.registry_path = os.path.join(self.temp_dir, "test_managed.json")
+        reg.data = {"instances": {}, "global_settings": {}}
+        reg.save()
+
+        log_path = os.path.join(self.temp_dir, "test_startup.log")
+        results = run_startup_update_all(registry=reg, log_file=log_path)
+        self.assertEqual(results["checked_count"], 0)
+        self.assertTrue(os.path.exists(log_path))
 
 
 if __name__ == "__main__":

@@ -59,6 +59,7 @@ class UpdaterConfig:
             "open_when_done": "true",
             "delete_compressed": "true",
             "run_script_after_update": "false",
+            "auto_update_on_startup": "true",
         }
         self.config["ExcludedFiles"] = {}
 
@@ -154,6 +155,14 @@ class UpdaterConfig:
     def run_script_after_update(self, value: bool):
         self.config.set("Settings", "run_script_after_update", "true" if value else "false")
 
+    @property
+    def auto_update_on_startup(self) -> bool:
+        return self.config.getboolean("Settings", "auto_update_on_startup", fallback=True)
+
+    @auto_update_on_startup.setter
+    def auto_update_on_startup(self, value: bool):
+        self.config.set("Settings", "auto_update_on_startup", "true" if value else "false")
+
     # --- Excluded Files ---
     def get_excluded_files(self) -> Dict[str, Dict[str, str]]:
         """
@@ -209,7 +218,15 @@ class ManagedRegistry:
     """
     def __init__(self):
         self.registry_path = get_managed_registry_path()
-        self.data: Dict[str, Any] = {"instances": {}, "global_settings": {"open_when_done": True, "delete_compressed": True}}
+        self.data: Dict[str, Any] = {
+            "instances": {},
+            "global_settings": {
+                "open_when_done": True,
+                "delete_compressed": True,
+                "run_script_after_update": False,
+                "auto_update_on_startup": False,
+            }
+        }
         self.load()
 
     def load(self):
@@ -220,9 +237,24 @@ class ManagedRegistry:
                 if "instances" not in self.data:
                     self.data["instances"] = {}
                 if "global_settings" not in self.data:
-                    self.data["global_settings"] = {"open_when_done": True, "delete_compressed": True}
+                    self.data["global_settings"] = {
+                        "open_when_done": True,
+                        "delete_compressed": True,
+                        "run_script_after_update": False,
+                        "auto_update_on_startup": False,
+                    }
+                elif "auto_update_on_startup" not in self.data["global_settings"]:
+                    self.data["global_settings"]["auto_update_on_startup"] = False
             except Exception:
-                self.data = {"instances": {}, "global_settings": {"open_when_done": True, "delete_compressed": True}}
+                self.data = {
+                    "instances": {},
+                    "global_settings": {
+                        "open_when_done": True,
+                        "delete_compressed": True,
+                        "run_script_after_update": False,
+                        "auto_update_on_startup": False,
+                    }
+                }
 
     def save(self):
         with open(self.registry_path, "w", encoding="utf-8") as f:
@@ -288,13 +320,15 @@ class ManagedRegistry:
             "open_when_done": True,
             "delete_compressed": True,
             "run_script_after_update": False,
+            "auto_update_on_startup": False,
         })
 
-    def save_global_settings(self, open_when_done: bool, delete_compressed: bool, run_script_after_update: bool = False):
+    def save_global_settings(self, open_when_done: bool, delete_compressed: bool, run_script_after_update: bool = False, auto_update_on_startup: bool = False):
         self.data["global_settings"] = {
             "open_when_done": open_when_done,
             "delete_compressed": delete_compressed,
             "run_script_after_update": run_script_after_update,
+            "auto_update_on_startup": auto_update_on_startup,
         }
         self.save()
 

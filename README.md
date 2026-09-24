@@ -100,6 +100,19 @@ Monitor, check, and update all managed Git installations across your PC from one
 
 ---
 
+## Auto-update on machine launch
+
+Updraft can automatically check and update your managed projects in the background whenever your computer starts:
+
+- **Non-intrusive**: Configured via the standard Windows user registry key (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`), requiring no administrator privileges.
+- **Headless background execution**: Runs silently with `--startup`, downloads and installs matched updates without interrupting your workflow, preserves excluded configuration files, and triggers `update-done.bat` if configured.
+- **Logging and notifications**: Records all startup actions to `%APPDATA%\SimpleUpdater\startup_update.log` and displays a Windows desktop notification whenever projects are updated.
+- **How to enable**:
+  - In `UpdateManager.exe`, click **Global Settings**, check **Check and update all managed projects on Windows startup**, and click **Save and Close**.
+  - Individual projects can opt out of startup updates via their respective **Settings** dialog.
+
+---
+
 ## Smart asset matching
 
 When a new release is published, asset file names often change (e.g., `app-win64-v1.0.zip` becomes `app-win64-v1.1.zip`). Updraft resolves this automatically using a three-tier matching algorithm:
@@ -121,7 +134,8 @@ updraft/
 │   ├── config.py           # updater-info.ini and AppData registry
 │   ├── downloader.py       # Download, extraction, exclusion, and shortcut logic
 │   ├── git_client.py       # GitHub API client (releases, commits, assets)
-│   └── theme.py            # Windows 7 Aero GUI styling
+│   ├── startup.py          # Windows startup registry & silent background runner
+│   └── theme.py            # Windows 7 Aero GUI styling & window icons
 ├── gui/
 │   ├── asset_picker_dialog.py  # Fallback asset picker when filenames change
 │   ├── exclude_window.py       # File exclusion tree view

@@ -23,6 +23,12 @@ def main():
 
     config = UpdaterConfig(app_dir)
 
+    if "--startup" in sys.argv or "--silent" in sys.argv:
+        if config.exists():
+            from core.startup import run_silent_single_update
+            run_silent_single_update(app_dir)
+        sys.exit(0)
+
     # Standalone check: If there is no updater-info.ini in the same folder, proceed to install phase
     if not config.exists():
         def on_installed(target_project_dir: str):

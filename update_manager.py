@@ -6,10 +6,14 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
-from gui.manager_window import UpdateManagerWindow
-
 
 def main():
+    if "--startup" in sys.argv or "--silent" in sys.argv:
+        from core.startup import run_startup_update_all
+        run_startup_update_all()
+        sys.exit(0)
+
+    from gui.manager_window import UpdateManagerWindow
     app = UpdateManagerWindow()
     app.mainloop()
 

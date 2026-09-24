@@ -27,8 +27,8 @@ class SettingsDialog(tk.Toplevel):
 
         title_text = "Global Updater Settings" if is_global else f"Settings - {config.project_name or 'Simple Updater'}"
         self.title(title_text)
-        self.geometry("480x350")
-        self.minsize(440, 320)
+        self.geometry("500x390")
+        self.minsize(460, 340)
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -66,7 +66,7 @@ class SettingsDialog(tk.Toplevel):
         body_frame = ttk.Frame(self, padding=(20, 16))
         body_frame.pack(fill="both", expand=True, side="top")
 
-        group = ttk.LabelFrame(body_frame, text="Completion Options", padding=(15, 12))
+        group = ttk.LabelFrame(body_frame, text="Options & Startup", padding=(15, 12))
         group.pack(fill="both", expand=True)
 
         self.var_open = tk.BooleanVar(value=self.config.open_when_done)
@@ -75,7 +75,7 @@ class SettingsDialog(tk.Toplevel):
             text="Open it when done (Open 'main' folder after completion)",
             variable=self.var_open
         )
-        self.chk_open.pack(anchor="w", pady=(4, 6))
+        self.chk_open.pack(anchor="w", pady=(4, 5))
 
         self.var_delete = tk.BooleanVar(value=self.config.delete_compressed)
         self.chk_delete = ttk.Checkbutton(
@@ -83,7 +83,7 @@ class SettingsDialog(tk.Toplevel):
             text="Delete the compressed file when done? (Removes downloaded zip/tar)",
             variable=self.var_delete
         )
-        self.chk_delete.pack(anchor="w", pady=(4, 6))
+        self.chk_delete.pack(anchor="w", pady=(4, 5))
 
         self.var_run_script = tk.BooleanVar(value=getattr(self.config, "run_script_after_update", False))
         self.chk_run_script = ttk.Checkbutton(
@@ -91,13 +91,32 @@ class SettingsDialog(tk.Toplevel):
             text="Run script after update complete (Runs update-done.bat in terminal)",
             variable=self.var_run_script
         )
-        self.chk_run_script.pack(anchor="w", pady=(4, 4))
+        self.chk_run_script.pack(anchor="w", pady=(4, 5))
+
+        startup_val = getattr(self.config, "auto_update_on_startup", False if self.is_global else True)
+        self.var_startup = tk.BooleanVar(value=startup_val)
+        startup_text = (
+            "Check and update all managed projects on Windows startup"
+            if self.is_global
+            else "Include this project in startup auto-updates"
+        )
+        self.chk_startup = ttk.Checkbutton(
+            group,
+            text=startup_text,
+            variable=self.var_startup
+        )
+        self.chk_startup.pack(anchor="w", pady=(4, 4))
 
     def _save_and_close(self):
         self.config.open_when_done = self.var_open.get()
         self.config.delete_compressed = self.var_delete.get()
         self.config.run_script_after_update = self.var_run_script.get()
+        self.config.auto_update_on_startup = self.var_startup.get()
         self.config.save()
+
+        if self.is_global:
+            from core.startup import set_startup_enabled
+            set_startup_enabled(self.var_startup.get())
 
         if self.on_save_callback:
             self.on_save_callback()

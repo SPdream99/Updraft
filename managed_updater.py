@@ -26,6 +26,12 @@ def main():
     # updater first open or later open will all update its current location to the manager.
     registry.update_instance_location(app_dir, exe_path)
 
+    if "--startup" in sys.argv or "--silent" in sys.argv:
+        if config.exists():
+            from core.startup import run_silent_single_update
+            run_silent_single_update(app_dir)
+        sys.exit(0)
+
     # Managed check:
     # "An instance of this app, if managed type and there are no info data for the current
     # location of this instance store in the same folder in appdata and updater-info.ini
