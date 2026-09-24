@@ -23,6 +23,8 @@ from core.theme import (
     ACCENT_BLUE,
 )
 from core.asset_matcher import match_release_assets
+from core.version import APP_VERSION, APP_NAME
+from core.self_updater import check_app_update, perform_app_self_update
 from gui.asset_picker_dialog import AssetPickerDialog
 from gui.exclude_window import ExcludeFilesDialog
 from gui.settings_window import SettingsDialog
@@ -51,8 +53,18 @@ class UpdateManagerWindow(tk.Tk):
         self.instances: Dict[str, Dict[str, Any]] = {}
         self.remote_status: Dict[str, Dict[str, Any]] = {}
 
+        if getattr(sys, "frozen", False):
+            self.updater_exe_path = os.path.abspath(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.updater_exe_path = os.path.join(base_dir, "dist", "UpdateManager.exe")
+
         self._build_ui()
         self._refresh_list()
+
+        # Check for Updraft self-update if auto_update_self is enabled
+        if self.registry.get_global_settings().get("auto_update_self", True):
+            self.after(1500, lambda: self._on_update_app(silent=True))
 
     def _build_ui(self):
         create_win7_header(
@@ -76,6 +88,9 @@ class UpdateManagerWindow(tk.Tk):
 
         btn_add = ttk.Button(toolbar, text="+ Add Existing Folder...", command=self._on_add_folder)
         btn_add.pack(side="left", padx=(0, 6))
+
+        btn_update_app = ttk.Button(toolbar, text=f"Update Updraft ({APP_VERSION})", command=lambda: self._on_update_app(silent=False))
+        btn_update_app.pack(side="left", padx=(0, 6))
 
         btn_global_settings = ttk.Button(toolbar, text="Global Settings", command=self._on_global_settings)
         btn_global_settings.pack(side="right")
@@ -323,6 +338,7 @@ class UpdateManagerWindow(tk.Tk):
                 self.delete_compressed = s.get("delete_compressed", True)
                 self.run_script_after_update = s.get("run_script_after_update", False)
                 self.auto_update_on_startup = s.get("auto_update_on_startup", False)
+                self.auto_update_self = s.get("auto_update_self", True)
                 self.project_name = "Global Settings"
 
             def save(self):
@@ -330,7 +346,8 @@ class UpdateManagerWindow(tk.Tk):
                     self.open_when_done,
                     self.delete_compressed,
                     self.run_script_after_update,
-                    self.auto_update_on_startup
+                    self.auto_update_on_startup,
+                    self.auto_update_self
                 )
 
         mock = MockGlobalConfig(self.registry)
@@ -589,5 +606,63 @@ class UpdateManagerWindow(tk.Tk):
             self.after(0, self._refresh_list)
             self.after(0, lambda: messagebox.showinfo("Update All", f"Completed updating {successes} project(s)!", parent=self))
             self.after(0, lambda: self.lbl_status.config(text="Finished batch update.", foreground=SUCCESS_GREEN))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_update_app(self, silent: bool = False):
+        if not silent:
+            self.lbl_status.config(text="Checking for Updraft updates...", foreground=ACCENT_BLUE)
+
+        def worker():
+            try:
+                res = check_app_update("UpdateManager.exe")
+                if res.get("has_update"):
+                    latest = res["latest_version"]
+                    url = res.get("asset_url")
+
+                    def prompt_and_update():
+                        confirm = messagebox.askyesno(
+                            "Updraft Update Available",
+                            f"A new version of Updraft is available!\n\n"
+                            f"Current Version: {APP_VERSION}\n"
+                            f"Latest Version:  {latest}\n\n"
+                            f"Do you want to download and install this update now?",
+                            parent=self
+                        )
+                        if confirm:
+                            if not url:
+                                messagebox.showwarning(
+                                    "Update Notice",
+                                    f"No precompiled binary asset found for UpdateManager.exe in release {latest}.\nPlease visit GitHub to download manually.",
+                                    parent=self
+                                )
+                                return
+                            self._start_app_update(url)
+
+                    self.after(0, prompt_and_update)
+                else:
+                    if not silent:
+                        msg = f"Updraft is currently up to date ({APP_VERSION})."
+                        self.after(0, lambda: messagebox.showinfo("Updraft Up to Date", msg, parent=self))
+            except Exception as e:
+                if not silent:
+                    self.after(0, lambda: messagebox.showerror("Check Failed", f"Could not check for Updraft update: {e}", parent=self))
+            finally:
+                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_app_update(self, download_url: str):
+        self.lbl_status.config(text="Downloading Updraft update...", foreground=ACCENT_BLUE)
+
+        def prog(pct):
+            self.after(0, lambda: self.lbl_status.config(text=f"Downloading Updraft update... {int(pct * 100)}%", foreground=ACCENT_BLUE))
+
+        def worker():
+            try:
+                perform_app_self_update(download_url, self.updater_exe_path, progress_callback=prog)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Self-Update Error", f"Failed to perform self-update:\n{e}", parent=self))
+                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
 
         threading.Thread(target=worker, daemon=True).start()

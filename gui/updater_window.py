@@ -23,6 +23,8 @@ from core.theme import (
     ACCENT_BLUE,
 )
 from core.asset_matcher import match_release_assets
+from core.version import APP_VERSION, APP_NAME
+from core.self_updater import check_app_update, perform_app_self_update
 from gui.asset_picker_dialog import AssetPickerDialog
 from gui.exclude_window import ExcludeFilesDialog
 from gui.settings_window import SettingsDialog
@@ -52,8 +54,8 @@ class UpdaterMainWindow(tk.Tk):
         proj_title = self.config.project_name or os.path.basename(self.project_dir)
         mode_str = "Managed" if self.is_managed else "Standalone"
         self.title(f"{proj_title} - Updater ({mode_str})")
-        self.geometry("540x530")
-        self.minsize(500, 490)
+        self.geometry("540x570")
+        self.minsize(500, 520)
         self.resizable(False, False)
 
         apply_win7_theme(self)
@@ -68,6 +70,10 @@ class UpdaterMainWindow(tk.Tk):
             pass
 
         self._build_ui()
+
+        # Check for Updraft self-update if auto_update_self is enabled
+        if getattr(self.config, "auto_update_self", True):
+            self.after(1500, lambda: self._on_update_self(silent=True))
 
     def _build_ui(self):
         proj_name = self.config.project_name or os.path.basename(self.project_dir)
@@ -158,7 +164,16 @@ class UpdaterMainWindow(tk.Tk):
         )
         self.btn_run_script.pack(fill="x", pady=4, ipady=3)
 
-        # Button 5: Close
+        # Button 5: Update Updraft (Self Update)
+        self.btn_update_self = ttk.Button(
+            btn_group,
+            text=f"Update Updraft ({APP_VERSION})",
+            style="Large.TButton",
+            command=lambda: self._on_update_self(silent=False)
+        )
+        self.btn_update_self.pack(fill="x", pady=4, ipady=3)
+
+        # Button 6: Close
         self.btn_close = ttk.Button(
             btn_group,
             text="Close",
@@ -369,7 +384,69 @@ class UpdaterMainWindow(tk.Tk):
         self.btn_exclude_file.config(state=state)
         self.btn_settings.config(state=state)
         self.btn_run_script.config(state=state)
+        self.btn_update_self.config(state=state)
         self.btn_close.config(state=state)
+
+    def _on_update_self(self, silent: bool = False):
+        bin_name = os.path.basename(self.updater_exe_path)
+        self.lbl_status.config(text="Checking for Updraft updates...", foreground=ACCENT_BLUE)
+
+        def worker():
+            try:
+                res = check_app_update(bin_name)
+                if res.get("has_update"):
+                    latest = res["latest_version"]
+                    url = res.get("asset_url")
+
+                    def prompt_and_update():
+                        confirm = messagebox.askyesno(
+                            "Updraft Update Available",
+                            f"A new version of Updraft is available!\n\n"
+                            f"Current Version: {APP_VERSION}\n"
+                            f"Latest Version:  {latest}\n\n"
+                            f"Do you want to download and install this update now?",
+                            parent=self
+                        )
+                        if confirm:
+                            if not url:
+                                messagebox.showwarning(
+                                    "Update Notice",
+                                    f"No precompiled binary asset found for {bin_name} in release {latest}.\nPlease visit GitHub to download manually.",
+                                    parent=self
+                                )
+                                return
+                            self._start_self_update(url)
+
+                    self.after(0, prompt_and_update)
+                else:
+                    if not silent:
+                        msg = f"Updraft is currently up to date ({APP_VERSION})."
+                        self.after(0, lambda: messagebox.showinfo("Updraft Up to Date", msg, parent=self))
+            except Exception as e:
+                if not silent:
+                    self.after(0, lambda: messagebox.showerror("Check Failed", f"Could not check for Updraft update: {e}", parent=self))
+            finally:
+                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _start_self_update(self, download_url: str):
+        self.lbl_status.config(text="Downloading Updraft update...", foreground=ACCENT_BLUE)
+        self.progress_bar["value"] = 0
+        self._set_buttons_state("disabled")
+
+        def prog(pct):
+            self.after(0, lambda: self.progress_bar.config(value=pct * 100))
+
+        def worker():
+            try:
+                perform_app_self_update(download_url, self.updater_exe_path, progress_callback=prog)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Self-Update Error", f"Failed to perform self-update:\n{e}", parent=self))
+                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+                self.after(0, lambda: self._set_buttons_state("normal"))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _on_update_success(self, version_name: str):
         self.lbl_status.config(text=f"Successfully updated to {version_name}!", foreground=SUCCESS_GREEN)

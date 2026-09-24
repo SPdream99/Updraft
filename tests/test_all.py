@@ -339,5 +339,71 @@ class TestStartup(unittest.TestCase):
         self.assertTrue(os.path.exists(log_path))
 
 
+class TestSelfUpdater(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_version_tuple_parsing(self):
+        from core.self_updater import parse_version_tuple
+        self.assertEqual(parse_version_tuple("v1.0.0"), (1, 0, 0))
+        self.assertEqual(parse_version_tuple("1.2.3.4"), (1, 2, 3, 4))
+        self.assertEqual(parse_version_tuple("v2.1-rc1"), (2, 1))
+        self.assertEqual(parse_version_tuple("invalid"), (0,))
+
+    def test_is_newer_version(self):
+        from core.self_updater import is_newer_version
+        self.assertTrue(is_newer_version("v1.0.1", "v1.0.0"))
+        self.assertTrue(is_newer_version("v1.10.0", "v1.9.0"))
+        self.assertTrue(is_newer_version("v2.0.0", "v1.9.9"))
+        self.assertFalse(is_newer_version("v1.0.0", "v1.0.0"))
+        self.assertFalse(is_newer_version("v0.9.0", "v1.0.0"))
+        self.assertFalse(is_newer_version("v1.0.0", "v1.0.1"))
+
+    def test_config_auto_update_self(self):
+        cfg = UpdaterConfig(self.temp_dir)
+        self.assertTrue(cfg.auto_update_self)
+        cfg.auto_update_self = False
+        cfg.save()
+
+        cfg2 = UpdaterConfig(self.temp_dir)
+        self.assertFalse(cfg2.auto_update_self)
+
+    def test_managed_registry_auto_update_self(self):
+        reg = ManagedRegistry()
+        reg.registry_path = os.path.join(self.temp_dir, "test_managed.json")
+        reg.save_global_settings(True, True, True, auto_update_on_startup=True, auto_update_self=False)
+
+        loaded = reg.get_global_settings()
+        self.assertFalse(loaded.get("auto_update_self"))
+
+    def test_check_app_update_has_newer(self):
+        import json
+        from unittest.mock import patch, MagicMock
+        from core.self_updater import check_app_update
+
+        fake_response_data = {
+            "tag_name": "v9.9.9",
+            "assets": [
+                {
+                    "name": "SimpleUpdater.exe",
+                    "browser_download_url": "https://github.com/SPdream99/Updraft/releases/download/v9.9.9/SimpleUpdater.exe"
+                }
+            ]
+        }
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(fake_response_data).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch("core.git_client.urllib.request.urlopen", return_value=mock_resp):
+            res = check_app_update(target_binary_name="SimpleUpdater.exe")
+            self.assertTrue(res.get("has_update"))
+            self.assertEqual(res.get("latest_version"), "v9.9.9")
+            self.assertEqual(res.get("asset_url"), "https://github.com/SPdream99/Updraft/releases/download/v9.9.9/SimpleUpdater.exe")
+
+
 if __name__ == "__main__":
     unittest.main()
+

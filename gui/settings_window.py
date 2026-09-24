@@ -27,8 +27,8 @@ class SettingsDialog(tk.Toplevel):
 
         title_text = "Global Updater Settings" if is_global else f"Settings - {config.project_name or 'Simple Updater'}"
         self.title(title_text)
-        self.geometry("500x390")
-        self.minsize(460, 340)
+        self.geometry("500x420")
+        self.minsize(460, 360)
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -105,13 +105,22 @@ class SettingsDialog(tk.Toplevel):
             text=startup_text,
             variable=self.var_startup
         )
-        self.chk_startup.pack(anchor="w", pady=(4, 4))
+        self.chk_startup.pack(anchor="w", pady=(4, 5))
+
+        self.var_self_update = tk.BooleanVar(value=getattr(self.config, "auto_update_self", True))
+        self.chk_self_update = ttk.Checkbutton(
+            group,
+            text="Auto-update Updraft app when a new release is available",
+            variable=self.var_self_update
+        )
+        self.chk_self_update.pack(anchor="w", pady=(4, 4))
 
     def _save_and_close(self):
         self.config.open_when_done = self.var_open.get()
         self.config.delete_compressed = self.var_delete.get()
         self.config.run_script_after_update = self.var_run_script.get()
         self.config.auto_update_on_startup = self.var_startup.get()
+        self.config.auto_update_self = self.var_self_update.get()
         self.config.save()
 
         if self.is_global:

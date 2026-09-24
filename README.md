@@ -113,6 +113,17 @@ Updraft can automatically check and update your managed projects in the backgrou
 
 ---
 
+## Application self-updating
+
+Updraft executables (`SimpleUpdater.exe`, `ManagedUpdater.exe`, and `UpdateManager.exe`) can update themselves directly:
+
+- **Dedicated update button**: Click **Update Updraft (v1.0.0)** in the main updater or manager dashboard toolbar to immediately check for newer releases.
+- **Automatic update on launch**: When enabled (default: on), the application checks GitHub in the background upon launch and alerts you if a newer version is available with one-click installation.
+- **Seamless binary replacement**: Since Windows locks running executables, Updraft stages the downloaded binary, coordinates a clean handoff through a detached helper, swaps the executable, and automatically restarts the new version.
+- **Configurable**: Toggle application self-updates on or off in the **Settings** dialog.
+
+---
+
 ## Smart asset matching
 
 When a new release is published, asset file names often change (e.g., `app-win64-v1.0.zip` becomes `app-win64-v1.1.zip`). Updraft resolves this automatically using a three-tier matching algorithm:
@@ -134,8 +145,10 @@ updraft/
 │   ├── config.py           # updater-info.ini and AppData registry
 │   ├── downloader.py       # Download, extraction, exclusion, and shortcut logic
 │   ├── git_client.py       # GitHub API client (releases, commits, assets)
+│   ├── self_updater.py     # In-place self-update and binary swap orchestration
 │   ├── startup.py          # Windows startup registry & silent background runner
-│   └── theme.py            # Windows 7 Aero GUI styling & window icons
+│   ├── theme.py            # Windows 7 Aero GUI styling & window icons
+│   └── version.py          # Application metadata and version definitions
 ├── gui/
 │   ├── asset_picker_dialog.py  # Fallback asset picker when filenames change
 │   ├── exclude_window.py       # File exclusion tree view
