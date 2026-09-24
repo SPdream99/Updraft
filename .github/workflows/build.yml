@@ -30,6 +30,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/simple-updater-win.zip
             dist/SimpleUpdater.exe
             dist/ManagedUpdater.exe
             dist/UpdateManager.exe
@@ -38,6 +39,7 @@ jobs:
 
             | File | Description |
             |------|-------------|
+            | simple-updater-win.zip | Complete bundle containing all 3 executables |
             | SimpleUpdater.exe | Standalone updater — drop into any project folder |
             | ManagedUpdater.exe | Managed updater — tracked by UpdateManager |
             | UpdateManager.exe | Central dashboard for all managed projects |

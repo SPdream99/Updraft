@@ -20,7 +20,7 @@
 
 ## What it does
 
-Updraft ships as three separate executables:
+Updraft ships as three separate executables, available individually or bundled in `simple-updater-win.zip` from GitHub Releases:
 
 **SimpleUpdater.exe** — The standalone version. It lives inside your project folder and reads its configuration from a local `updater-info.ini` file. No installation required, no external dependencies.
 
@@ -217,6 +217,7 @@ Output goes to `dist/`:
 - `dist/SimpleUpdater.exe`
 - `dist/ManagedUpdater.exe`
 - `dist/UpdateManager.exe`
+- `dist/simple-updater-win.zip` (bundle containing all three executables)
 
 Run tests:
 ```

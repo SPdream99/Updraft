@@ -69,6 +69,22 @@ def build_all():
         else:
             print(f"Warning: {target_exe} not found in dist directory.")
 
+    # Create zip package containing all 3 executables
+    print("\n---> Packaging executables into zip bundle...")
+    import zipfile
+    zip_name = "simple-updater-win.zip"
+    zip_path = os.path.join(DIST_DIR, zip_name)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for app in APPS:
+            exe_file = f"{app['name']}.exe"
+            exe_src = os.path.join(DIST_DIR, exe_file)
+            if os.path.exists(exe_src):
+                zf.write(exe_src, arcname=exe_file)
+                print(f"  Added {exe_file} to {zip_name}")
+
+    zip_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
+    print(f"SUCCESS: Created {zip_path} ({zip_size_mb:.2f} MB)")
+
     print("\n" + "=" * 60)
     print("Build finished successfully!")
     print(f"Binaries available in: {DIST_DIR}")
