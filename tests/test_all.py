@@ -130,6 +130,8 @@ class TestDownloaderAndEngine(unittest.TestCase):
         self.assertTrue(is_executable("launcher.vbs"))
         self.assertTrue(is_executable("worker.js"))
         self.assertTrue(is_executable("job.wsf"))
+        self.assertTrue(is_executable("index.html"))
+        self.assertTrue(is_executable("page.htm"))
         self.assertFalse(is_executable("data.json"))
         self.assertFalse(is_executable("readme.md"))
 

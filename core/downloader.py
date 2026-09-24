@@ -27,6 +27,8 @@ EXECUTABLE_EXTENSIONS = {
     ".wsf",
     ".wsh",
     ".msc",
+    ".html",
+    ".htm",
 }
 
 
