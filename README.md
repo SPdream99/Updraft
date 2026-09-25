@@ -38,7 +38,7 @@ When launched in a folder without an existing configuration, the updater opens a
 
 1. Enter a GitHub repository URL (`https://github.com/owner/repo` or shorthand `owner/repo`).
 2. Choose an update source:
-   - **Release Page** — select one or more release asset files to download.
+   - **Release Page** — select one or more release asset files to download with convenient **Select All** and **Deselect All** controls.
    - **Source Code** — download the latest commit as a zip archive.
 3. Set completion options:
    - Open 'main' folder when done.
@@ -79,7 +79,7 @@ From here:
 
 - **Check for Update** — queries GitHub for a newer release or commit. Shows a comparison before downloading. Preserves excluded files.
 - **Exclude-File** — browse files in `main/`, search, filter, and mark files to be protected from updates.
-- **Setting** — toggle post-download options, startup updates, app self-updates, subfolder depth, and access shortcut customization.
+- **Setting** — toggle post-download options, startup updates, app self-updates, subfolder depth, shortcut customization, and select which release files to download.
 - **Run bat script** — execute `update-done.bat` in a visible terminal, starting in `main/`.
 - **Create Shortcuts** — generate or regenerate Windows shortcuts, folder shortcuts, and launcher scripts in the project folder or dedicated `Shortcuts/` directory.
 
@@ -97,7 +97,7 @@ Protect local configurations, save files, or custom scripts from being overwritt
 - **Multi-criteria filters**: Filter by All Files, Excluded Only, Included Only, Updates Available, Executables, Configurations & Data, or Python & Scripts.
 - **Interactive sorting**: Click column headers (Name, Folder, Excluded?, Size) to toggle ascending/descending sort, or pick from the Sort dropdown.
 - **View modes**: Switch between Hierarchical Folder Tree and Flat List view.
-- **Batch operations**: One-click actions to Exclude All Filtered, Include All Filtered, or Invert Filtered Selection.
+- **Quick selection and batch operations**: One-click actions to Select All [✓], Deselect All [  ], or Invert Selection with keyboard shortcut support (Ctrl+A).
 - **Individual updates**: Update a single protected file from the repository when a newer version is available.
 
 ---

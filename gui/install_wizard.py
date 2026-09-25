@@ -242,6 +242,19 @@ class InstallWizard(tk.Tk):
             ttk.Label(self.asset_frame, text="No assets attached to this release.").pack(anchor="w")
             return
 
+        # Action toolbar for release assets: Select All / Deselect All
+        action_bar = ttk.Frame(self.asset_frame)
+        action_bar.pack(fill="x", pady=(0, 6))
+
+        btn_all = ttk.Button(action_bar, text="Select All", width=12, command=self._select_all_assets)
+        btn_all.pack(side="left", padx=(0, 6))
+
+        btn_none = ttk.Button(action_bar, text="Deselect All", width=12, command=self._deselect_all_assets)
+        btn_none.pack(side="left", padx=(0, 8))
+
+        self.lbl_asset_count = ttk.Label(action_bar, text="", foreground=MUTED_TEXT, font=("Segoe UI", 9))
+        self.lbl_asset_count.pack(side="left")
+
         canvas = tk.Canvas(self.asset_frame, bg=PANEL_BG, highlightthickness=1, highlightbackground=LIGHT_BORDER)
         scrollbar = ttk.Scrollbar(self.asset_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas, style="White.TFrame", padding=6)
@@ -278,9 +291,28 @@ class InstallWizard(tk.Tk):
                 scrollable_frame,
                 text=f"{name} {size_mb}",
                 variable=var,
+                command=self._update_asset_count,
                 style="White.TCheckbutton"
             )
             chk.pack(anchor="w", pady=2)
+
+        self._update_asset_count()
+
+    def _select_all_assets(self):
+        for v in self.asset_check_vars.values():
+            v.set(True)
+        self._update_asset_count()
+
+    def _deselect_all_assets(self):
+        for v in self.asset_check_vars.values():
+            v.set(False)
+        self._update_asset_count()
+
+    def _update_asset_count(self):
+        if hasattr(self, "lbl_asset_count") and self.lbl_asset_count.winfo_exists():
+            total = len(self.asset_check_vars)
+            selected = sum(1 for v in self.asset_check_vars.values() if v.get())
+            self.lbl_asset_count.config(text=f"({selected} of {total} selected)")
 
     # --- STEP 3: Options ---
     def _render_step_3_options(self):

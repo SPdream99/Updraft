@@ -284,6 +284,36 @@ class ExcludeFilesDialog(tk.Toplevel):
         self.cbo_view.pack(side="left")
         self.cbo_view.bind("<<ComboboxSelected>>", lambda e: self._apply_filters_and_render())
 
+        # Row 3: Quick Selection (Select All / Deselect All / Invert)
+        sel_row = ttk.Frame(toolbar_frame)
+        sel_row.pack(fill="x", pady=(3, 1))
+
+        ttk.Label(sel_row, text="Select:").pack(side="left", padx=(0, 6))
+
+        btn_sel_all = ttk.Button(
+            sel_row,
+            text="Select All [✓]",
+            width=13,
+            command=self._on_exclude_all_visible
+        )
+        btn_sel_all.pack(side="left", padx=(0, 4))
+
+        btn_desel_all = ttk.Button(
+            sel_row,
+            text="Deselect All [  ]",
+            width=15,
+            command=self._on_include_all_visible
+        )
+        btn_desel_all.pack(side="left", padx=(0, 4))
+
+        btn_invert = ttk.Button(
+            sel_row,
+            text="Invert [⇅]",
+            width=10,
+            command=self._on_invert_visible
+        )
+        btn_invert.pack(side="left", padx=(0, 4))
+
         # Treeview + Scrollbars
         tree_container = ttk.Frame(left_frame)
         tree_container.pack(fill="both", expand=True)
@@ -311,6 +341,10 @@ class ExcludeFilesDialog(tk.Toplevel):
         self.tree.bind("<Button-1>", self._on_tree_click)
         self.tree.bind("<Double-1>", self._on_tree_double_click)
         self.tree.bind("<space>", self._on_tree_space)
+        self.tree.bind("<Control-a>", lambda e: (self._on_exclude_all_visible(), "break"))
+        self.tree.bind("<Control-A>", lambda e: (self._on_exclude_all_visible(), "break"))
+        self.bind("<Control-a>", lambda e: (self._on_exclude_all_visible(), "break"))
+        self.bind("<Control-A>", lambda e: (self._on_exclude_all_visible(), "break"))
 
         # Summary Bar under tree
         self.lbl_summary = ttk.Label(
@@ -386,21 +420,21 @@ class ExcludeFilesDialog(tk.Toplevel):
 
         btn_exclude_all = ttk.Button(
             batch_group,
-            text="Exclude All Filtered [✓]",
+            text="Select All (Exclude All) [✓]",
             command=self._on_exclude_all_visible
         )
         btn_exclude_all.pack(fill="x", pady=2)
 
         btn_include_all = ttk.Button(
             batch_group,
-            text="Include All Filtered [  ]",
+            text="Deselect All (Include All) [  ]",
             command=self._on_include_all_visible
         )
         btn_include_all.pack(fill="x", pady=2)
 
         btn_invert = ttk.Button(
             batch_group,
-            text="Invert Filtered Selection",
+            text="Invert Selection [⇅]",
             command=self._on_invert_visible
         )
         btn_invert.pack(fill="x", pady=2)
