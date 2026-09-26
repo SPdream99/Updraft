@@ -124,6 +124,9 @@ Monitor, check, and update all managed Git installations across your PC from one
   <img src="docs/images/update_manager.png" alt="Update Manager Dashboard" width="85%">
 </p>
 
+- **+ Create Updater**: Deploy a new managed updater into any selected folder directly from the manager dashboard. Built-in conflict detection prevents overwriting existing updaters or configurations. If setup is cancelled or fails, the deployed executable is automatically cleaned up.
+- **+ Add Existing Folder**: Quickly register existing folders containing `updater-info.ini`.
+- **Update Project Updaters**: Distribute the latest updater binaries to all managed projects on startup and on demand.
 - Supports one-click **Check All Updates** and **Update All**.
 - Per-project actions: Check, Update, Exclude Files, Settings, Run Script, Create Shortcuts, or Open Folder.
 

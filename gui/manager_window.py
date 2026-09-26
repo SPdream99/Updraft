@@ -24,10 +24,18 @@ from core.theme import (
 )
 from core.asset_matcher import match_release_assets
 from core.version import APP_VERSION, APP_NAME
-from core.self_updater import check_app_update, perform_app_self_update, update_all_managed_instances
+from core.self_updater import (
+    check_app_update,
+    perform_app_self_update,
+    update_all_managed_instances,
+    get_managed_updater_template,
+    check_updater_conflict,
+)
 from gui.asset_picker_dialog import AssetPickerDialog
 from gui.exclude_window import ExcludeFilesDialog
 from gui.settings_window import SettingsDialog
+from gui.create_updater_dialog import CreateUpdaterDialog
+
 
 
 class UpdateManagerWindow(tk.Tk):
@@ -86,6 +94,9 @@ class UpdateManagerWindow(tk.Tk):
 
         self.btn_refresh = ttk.Button(toolbar, text="Refresh List", command=self._refresh_list)
         self.btn_refresh.pack(side="left", padx=(0, 6))
+
+        self.btn_create_updater = ttk.Button(toolbar, text="+ Create Updater...", command=self._on_create_updater)
+        self.btn_create_updater.pack(side="left", padx=(0, 6))
 
         self.btn_add = ttk.Button(toolbar, text="+ Add Existing Folder...", command=self._on_add_folder)
         self.btn_add.pack(side="left", padx=(0, 6))
@@ -280,6 +291,7 @@ class UpdateManagerWindow(tk.Tk):
             self.btn_check_all,
             self.btn_update_all,
             self.btn_refresh,
+            self.btn_create_updater,
             self.btn_add,
             self.btn_update_updaters,
             self.btn_update_app,
@@ -385,6 +397,129 @@ class UpdateManagerWindow(tk.Tk):
         if confirm:
             self.registry.remove_instance(path)
             self._refresh_list()
+
+    def _on_create_updater(self):
+        CreateUpdaterDialog(self, registry=self.registry, on_create_callback=self._deploy_and_launch_updater)
+
+    def _deploy_and_launch_updater(self, target_folder: str):
+        has_conflict, reason = check_updater_conflict(target_folder, self.registry)
+        if has_conflict:
+            messagebox.showerror("Conflict Detected", reason, parent=self)
+            return
+
+        template_exe = get_managed_updater_template()
+        if not template_exe or not os.path.exists(template_exe):
+            fetch = messagebox.askyesno(
+                "Updater Template Missing",
+                "ManagedUpdater.exe was not found locally.\n\n"
+                "Would you like Update Manager to download updater binaries from GitHub?",
+                parent=self
+            )
+            if fetch:
+                self._on_update_project_updaters_manual()
+            return
+
+        dest_exe = os.path.join(target_folder, "ManagedUpdater.exe")
+        try:
+            import shutil
+            shutil.copy2(template_exe, dest_exe)
+        except Exception as e:
+            messagebox.showerror(
+                "Deployment Failed",
+                f"Failed to copy ManagedUpdater.exe to the selected folder:\n{e}",
+                parent=self
+            )
+            return
+
+        # Launch the newly copied updater
+        try:
+            proc = subprocess.Popen([dest_exe], cwd=target_folder)
+        except Exception as e:
+            messagebox.showerror(
+                "Launch Failed",
+                f"Failed to execute ManagedUpdater.exe:\n{e}",
+                parent=self
+            )
+            try:
+                if os.path.exists(dest_exe):
+                    os.remove(dest_exe)
+            except Exception:
+                pass
+            return
+
+        self.lbl_status.config(
+            text=f"Setup launched in '{os.path.basename(target_folder)}'. Waiting for setup completion...",
+            foreground=ACCENT_BLUE
+        )
+
+        threading.Thread(
+            target=self._monitor_new_updater,
+            args=(proc, target_folder, dest_exe),
+            daemon=True
+        ).start()
+
+    def _monitor_new_updater(self, proc: subprocess.Popen, target_folder: str, dest_exe: str):
+        import time
+        setup_succeeded = False
+
+        while proc.poll() is None:
+            ini_path = os.path.join(target_folder, "updater-info.ini")
+            if os.path.exists(ini_path):
+                cfg = UpdaterConfig(target_folder)
+                if cfg.git_url:
+                    setup_succeeded = True
+                    self.after(0, self._refresh_list)
+            time.sleep(1.0)
+
+        # Check again after process exit
+        ini_path = os.path.join(target_folder, "updater-info.ini")
+        if os.path.exists(ini_path):
+            cfg = UpdaterConfig(target_folder)
+            if cfg.git_url:
+                setup_succeeded = True
+
+        if setup_succeeded:
+            self.after(0, lambda: self._on_new_updater_succeeded(target_folder))
+        else:
+            self.after(0, lambda: self._on_new_updater_failed(target_folder, dest_exe))
+
+    def _on_new_updater_succeeded(self, target_folder: str):
+        self._refresh_list()
+        cfg = UpdaterConfig(target_folder)
+        pname = cfg.project_name or os.path.basename(target_folder)
+        self.lbl_status.config(
+            text=f"Managed updater successfully installed and configured for '{pname}'.",
+            foreground=SUCCESS_GREEN
+        )
+
+    def _on_new_updater_failed(self, target_folder: str, dest_exe: str):
+        def _cleanup():
+            import time
+            time.sleep(0.5)
+            for _ in range(10):
+                try:
+                    if os.path.exists(dest_exe):
+                        os.remove(dest_exe)
+                    break
+                except Exception:
+                    time.sleep(0.5)
+
+            # Cleanup incomplete/empty ini if left behind
+            ini_path = os.path.join(target_folder, "updater-info.ini")
+            if os.path.exists(ini_path):
+                try:
+                    cfg = UpdaterConfig(target_folder)
+                    if not cfg.git_url:
+                        os.remove(ini_path)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_cleanup, daemon=True).start()
+        self._refresh_list()
+        self.lbl_status.config(
+            text=f"Setup was cancelled or incomplete in '{os.path.basename(target_folder)}'. Temporary updater removed.",
+            foreground=MUTED_TEXT
+        )
 
     def _on_add_folder(self):
         folder = filedialog.askdirectory(title="Select Project Folder containing updater-info.ini", parent=self)

@@ -383,3 +383,109 @@ def check_and_update_project_updaters(
             "error": str(e)
         }
 
+
+def get_managed_updater_template() -> Optional[str]:
+    """
+    Locates an available ManagedUpdater.exe binary to use as a deployment template.
+    Searches next to the executable, in dist/, in AppData temp_update cache,
+    or extracts from a local zip bundle if present.
+    """
+    candidates = []
+
+    # 1. Next to current executable (frozen) or repo dist (unfrozen)
+    if getattr(sys, "frozen", False):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        candidates.append(os.path.join(exe_dir, "ManagedUpdater.exe"))
+        candidates.append(os.path.join(exe_dir, "dist", "ManagedUpdater.exe"))
+    else:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidates.append(os.path.join(repo_root, "dist", "ManagedUpdater.exe"))
+        candidates.append(os.path.join(repo_root, "ManagedUpdater.exe"))
+
+    # 2. AppData cache
+    from core.config import get_appdata_dir
+    cache_dir = os.path.join(get_appdata_dir(), "temp_update")
+    candidates.append(os.path.join(cache_dir, "ManagedUpdater.exe"))
+
+    for c in candidates:
+        if os.path.isfile(c) and os.path.getsize(c) > 0:
+            return os.path.abspath(c)
+
+    # 3. Check for local zip bundle and extract ManagedUpdater.exe
+    zip_candidates = []
+    if getattr(sys, "frozen", False):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        zip_candidates.append(os.path.join(exe_dir, "simple-updater-win.zip"))
+        zip_candidates.append(os.path.join(exe_dir, "dist", "simple-updater-win.zip"))
+    else:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        zip_candidates.append(os.path.join(repo_root, "dist", "simple-updater-win.zip"))
+        zip_candidates.append(os.path.join(repo_root, "simple-updater-win.zip"))
+
+    import zipfile
+    for zp in zip_candidates:
+        if os.path.isfile(zp):
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+                with zipfile.ZipFile(zp, "r") as zf:
+                    for member in zf.namelist():
+                        if member.lower().endswith("managedupdater.exe"):
+                            extracted = zf.extract(member, cache_dir)
+                            if os.path.isfile(extracted) and os.path.getsize(extracted) > 0:
+                                return os.path.abspath(extracted)
+            except Exception as e:
+                print(f"Warning: Failed to extract ManagedUpdater from {zp}: {e}")
+
+    return None
+
+
+def check_updater_conflict(target_folder: str, registry: Optional[Any] = None) -> tuple[bool, str]:
+    """
+    Checks if creating an updater in target_folder would result in a conflict.
+    Returns (has_conflict: bool, reason: str).
+    """
+    if not target_folder or not target_folder.strip():
+        return True, "No folder selected."
+
+    norm_folder = os.path.normpath(os.path.abspath(target_folder.strip()))
+
+    if not os.path.exists(norm_folder):
+        return True, f"The selected folder does not exist:\n{norm_folder}"
+
+    if not os.path.isdir(norm_folder):
+        return True, f"The selected path is not a directory:\n{norm_folder}"
+
+    # Check if target folder is Update Manager's own directory
+    if getattr(sys, "frozen", False):
+        mgr_dir = os.path.normpath(os.path.abspath(os.path.dirname(sys.executable)))
+    else:
+        mgr_dir = os.path.normpath(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+
+    if norm_folder.lower() == mgr_dir.lower():
+        return True, "Cannot create an updater inside the Update Manager application directory."
+
+    # Check for existing updater executables
+    managed_exe = os.path.join(norm_folder, "ManagedUpdater.exe")
+    if os.path.exists(managed_exe):
+        return True, f"An updater already exists in this folder:\n'{managed_exe}'"
+
+    simple_exe = os.path.join(norm_folder, "SimpleUpdater.exe")
+    if os.path.exists(simple_exe):
+        return True, f"An updater already exists in this folder:\n'{simple_exe}'"
+
+    # Check for existing updater-info.ini
+    ini_file = os.path.join(norm_folder, "updater-info.ini")
+    if os.path.exists(ini_file):
+        return True, f"A project configuration already exists in this folder:\n'{ini_file}'"
+
+    # Check if already registered in ManagedRegistry
+    if registry is None:
+        from core.config import ManagedRegistry
+        registry = ManagedRegistry()
+
+    if registry.has_instance(norm_folder):
+        return True, "This folder is already registered in Update Manager."
+
+    return False, ""
+
+
