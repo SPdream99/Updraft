@@ -132,8 +132,8 @@ class ExcludeFilesDialog(tk.Toplevel):
         self.engine = UpdateEngine(self.project_dir)
 
         self.title(f"Exclude Files from Updates - {config.project_name or 'Simple Updater'}")
-        self.geometry("960x620")
-        self.minsize(820, 520)
+        self.geometry("1020x660")
+        self.minsize(880, 560)
         self.transient(parent)
         self.grab_set()
 

@@ -43,8 +43,8 @@ class SettingsDialog(tk.Toplevel):
 
         title_text = "Global Updater Settings" if is_global else f"Settings - {config.project_name or 'Simple Updater'}"
         self.title(title_text)
-        self.geometry("600x560")
-        self.minsize(540, 500)
+        self.geometry("680x640")
+        self.minsize(600, 560)
         self.resizable(True, True)
         self.transient(parent)
         self.grab_set()

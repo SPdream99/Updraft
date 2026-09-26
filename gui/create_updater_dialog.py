@@ -33,8 +33,9 @@ class CreateUpdaterDialog(tk.Toplevel):
         self.on_create_callback = on_create_callback
 
         self.title("Create Managed Updater")
-        self.geometry("620x400")
-        self.minsize(560, 360)
+        self.geometry("660x420")
+        self.minsize(580, 380)
+        self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
 

@@ -46,8 +46,8 @@ class InstallWizard(tk.Tk):
 
         mode_label = "Managed Updater" if is_managed else "Simple Updater"
         self.title(f"{mode_label} - Setup & Installation Wizard")
-        self.geometry("680x640")
-        self.minsize(600, 520)
+        self.geometry("720x680")
+        self.minsize(660, 560)
 
         apply_win7_theme(self)
 

@@ -54,9 +54,9 @@ class UpdaterMainWindow(tk.Tk):
         proj_title = self.config.project_name or os.path.basename(self.project_dir)
         mode_str = "Managed" if self.is_managed else "Standalone"
         self.title(f"{proj_title} - Updater ({mode_str})")
-        self.geometry("540x620")
-        self.minsize(500, 560)
-        self.resizable(False, False)
+        self.geometry("560x660")
+        self.minsize(520, 600)
+        self.resizable(True, True)
 
         self.is_updating = False
         self.protocol("WM_DELETE_WINDOW", self._on_close_window)

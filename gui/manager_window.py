@@ -44,8 +44,8 @@ class UpdateManagerWindow(tk.Tk):
         self.registry = ManagedRegistry()
 
         self.title("Update Manager")
-        self.geometry("980x600")
-        self.minsize(860, 500)
+        self.geometry("1060x650")
+        self.minsize(940, 560)
 
         apply_win7_theme(self)
 
@@ -82,43 +82,52 @@ class UpdateManagerWindow(tk.Tk):
             "Monitor, check, and update all managed git project installations across your system"
         )
 
-        # Top Command Bar / Toolbar (Windows 7 Aero style)
-        toolbar = ttk.Frame(self, padding=(12, 8))
+        # Top Command Bar / Toolbar (Windows 7 Aero style, two clean rows to avoid crowding)
+        toolbar = ttk.Frame(self, padding=(12, 6))
         toolbar.pack(fill="x")
 
-        self.btn_check_all = ttk.Button(toolbar, text="Check All Updates", command=self._on_check_all)
+        # Row 1: Primary Project Operations & Global Settings
+        row1 = ttk.Frame(toolbar)
+        row1.pack(fill="x", pady=(0, 4))
+
+        self.btn_check_all = ttk.Button(row1, text="Check All Updates", command=self._on_check_all)
         self.btn_check_all.pack(side="left", padx=(0, 6))
 
-        self.btn_update_all = ttk.Button(toolbar, text="Update All", style="Accent.TButton", command=self._on_update_all)
+        self.btn_update_all = ttk.Button(row1, text="Update All", style="Accent.TButton", command=self._on_update_all)
         self.btn_update_all.pack(side="left", padx=(0, 6))
 
-        self.btn_refresh = ttk.Button(toolbar, text="Refresh List", command=self._refresh_list)
+        self.btn_refresh = ttk.Button(row1, text="Refresh List", command=self._refresh_list)
         self.btn_refresh.pack(side="left", padx=(0, 6))
 
-        self.btn_create_updater = ttk.Button(toolbar, text="+ Create Updater...", command=self._on_create_updater)
+        self.btn_create_updater = ttk.Button(row1, text="+ Create Updater...", command=self._on_create_updater)
         self.btn_create_updater.pack(side="left", padx=(0, 6))
 
-        self.btn_add = ttk.Button(toolbar, text="+ Add Existing Folder...", command=self._on_add_folder)
+        self.btn_add = ttk.Button(row1, text="+ Add Existing Folder...", command=self._on_add_folder)
         self.btn_add.pack(side="left", padx=(0, 6))
 
-        self.btn_update_updaters = ttk.Button(toolbar, text="Update Project Updaters", command=self._on_update_project_updaters_manual)
+        self.btn_global_settings = ttk.Button(row1, text="Global Settings", command=self._on_global_settings)
+        self.btn_global_settings.pack(side="right")
+
+        # Row 2: Maintenance actions & Startup status badge
+        row2 = ttk.Frame(toolbar)
+        row2.pack(fill="x", pady=(2, 0))
+
+        self.btn_update_updaters = ttk.Button(row2, text="Update Project Updaters", command=self._on_update_project_updaters_manual)
         self.btn_update_updaters.pack(side="left", padx=(0, 6))
 
-        self.btn_update_app = ttk.Button(toolbar, text=f"Update Updraft ({APP_VERSION})", command=lambda: self._on_update_app(silent=False))
+        self.btn_update_app = ttk.Button(row2, text=f"Update Updraft ({APP_VERSION})", command=lambda: self._on_update_app(silent=False))
         self.btn_update_app.pack(side="left", padx=(0, 6))
-
-        self.btn_global_settings = ttk.Button(toolbar, text="Global Settings", command=self._on_global_settings)
-        self.btn_global_settings.pack(side="right")
 
         from core.startup import is_startup_enabled
         startup_active = is_startup_enabled()
         self.lbl_startup_status = ttk.Label(
-            toolbar,
+            row2,
             text=f"Startup Auto-Update: {'Enabled' if startup_active else 'Disabled'}",
             font=("Segoe UI", 8),
             foreground=SUCCESS_GREEN if startup_active else MUTED_TEXT
         )
-        self.lbl_startup_status.pack(side="right", padx=(0, 12))
+        self.lbl_startup_status.pack(side="right", padx=(0, 4))
+
 
         sep_top = tk.Frame(self, height=1, bg=LIGHT_BORDER)
         sep_top.pack(fill="x")

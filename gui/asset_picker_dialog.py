@@ -39,8 +39,8 @@ class AssetPickerDialog(tk.Toplevel):
         self.on_confirm = on_confirm
 
         self.title(f"Select Assets - {self.project_name} ({self.release_tag})")
-        self.geometry("640x500")
-        self.minsize(560, 420)
+        self.geometry("680x520")
+        self.minsize(600, 440)
         self.transient(parent)
         self.grab_set()
 

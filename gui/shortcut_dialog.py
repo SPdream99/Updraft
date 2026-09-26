@@ -49,8 +49,8 @@ class ShortcutCustomizerDialog(tk.Toplevel):
 
         proj_title = config.project_name or os.path.basename(self.project_dir)
         self.title(f"Customize Shortcuts - {proj_title}")
-        self.geometry("820x620")
-        self.minsize(720, 520)
+        self.geometry("880x650")
+        self.minsize(780, 540)
         self.transient(parent)
         self.grab_set()
 
