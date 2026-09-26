@@ -209,6 +209,17 @@ class SettingsDialog(tk.Toplevel):
         )
         self.chk_self_update.pack(anchor="w", pady=(2, 2))
 
+        if self.is_global:
+            self.var_auto_update_project_updaters = tk.BooleanVar(
+                value=getattr(self.config, "auto_update_project_updaters", True)
+            )
+            self.chk_auto_update_project_updaters = ttk.Checkbutton(
+                grp_system,
+                text="Auto-update all project updaters when Update Manager starts",
+                variable=self.var_auto_update_project_updaters
+            )
+            self.chk_auto_update_project_updaters.pack(anchor="w", pady=(2, 2))
+
         # Quick link to Release Files tab if in project mode
         if not self.is_global:
             summary_frame = ttk.Frame(parent)
@@ -491,6 +502,8 @@ class SettingsDialog(tk.Toplevel):
         self.config.shortcut_folder_level = SHORTCUT_DEPTH_MAP.get(self.var_shortcut_depth.get(), 1)
         self.config.auto_update_on_startup = self.var_startup.get()
         self.config.auto_update_self = self.var_self_update.get()
+        if self.is_global and hasattr(self, "var_auto_update_project_updaters"):
+            self.config.auto_update_project_updaters = self.var_auto_update_project_updaters.get()
         self.config.save()
 
         if self.is_global:

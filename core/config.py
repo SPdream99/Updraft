@@ -428,6 +428,8 @@ class ManagedRegistry:
                         self.data["global_settings"]["auto_update_on_startup"] = False
                     if "auto_update_self" not in self.data["global_settings"]:
                         self.data["global_settings"]["auto_update_self"] = True
+                    if "auto_update_project_updaters" not in self.data["global_settings"]:
+                        self.data["global_settings"]["auto_update_project_updaters"] = True
                     if "create_shortcuts" not in self.data["global_settings"]:
                         self.data["global_settings"]["create_shortcuts"] = True
                     if "shortcut_folder_level" not in self.data["global_settings"]:
@@ -514,6 +516,7 @@ class ManagedRegistry:
             "run_script_after_update": False,
             "auto_update_on_startup": False,
             "auto_update_self": True,
+            "auto_update_project_updaters": True,
             "create_shortcuts": True,
             "create_folder_shortcuts": True,
             "shortcut_folder_level": 1,
@@ -531,6 +534,7 @@ class ManagedRegistry:
         shortcut_folder_level: int = 1,
         create_folder_shortcuts: bool = True,
         shortcut_layout: str = "root",
+        auto_update_project_updaters: bool = True,
     ):
         self.data["global_settings"] = {
             "open_when_done": open_when_done,
@@ -538,6 +542,7 @@ class ManagedRegistry:
             "run_script_after_update": run_script_after_update,
             "auto_update_on_startup": auto_update_on_startup,
             "auto_update_self": auto_update_self,
+            "auto_update_project_updaters": auto_update_project_updaters,
             "create_shortcuts": create_shortcuts,
             "shortcut_folder_level": shortcut_folder_level,
             "create_folder_shortcuts": create_folder_shortcuts,

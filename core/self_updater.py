@@ -183,10 +183,11 @@ def update_all_managed_instances(
     progress_callback: Optional[Callable[[float], None]] = None
 ) -> Dict[str, Any]:
     """
-    Downloads ManagedUpdater.exe from release assets and updates all
-    registered updater binaries across managed project instances in ManagedRegistry.
+    Downloads ManagedUpdater.exe (and/or SimpleUpdater.exe) from release assets or zip bundle
+    and updates all registered updater binaries across managed project instances in ManagedRegistry.
     """
     import shutil
+    import zipfile
     from core.config import ManagedRegistry, get_appdata_dir
 
     if registry is None:
@@ -196,57 +197,102 @@ def update_all_managed_instances(
     if not instances:
         return {"updated_count": 0, "total": 0, "errors": []}
 
-    # Locate ManagedUpdater or fallback to SimpleUpdater
+    cache_dir = os.path.join(get_appdata_dir(), "temp_update")
+    os.makedirs(cache_dir, exist_ok=True)
+
     managed_asset = None
+    simple_asset = None
+    zip_asset = None
+
     for a in assets:
         name = a.get("name", "").lower()
         if name == "managedupdater.exe":
             managed_asset = a
-            break
-
-    simple_asset = None
-    for a in assets:
-        name = a.get("name", "").lower()
-        if name == "simpleupdater.exe":
+        elif name == "simpleupdater.exe":
             simple_asset = a
-            break
+        elif name.endswith(".zip"):
+            if not zip_asset or "simple-updater" in name or "updraft" in name:
+                zip_asset = a
 
-    target_asset = managed_asset or simple_asset
-    if not target_asset or not target_asset.get("download_url"):
+    staged_managed = None
+    staged_simple = None
+
+    # 1. Try to download standalone .exe assets
+    target_exe_asset = managed_asset or simple_asset
+    if target_exe_asset and target_exe_asset.get("download_url"):
+        download_url = target_exe_asset["download_url"]
+        dest_name = target_exe_asset.get("name", "ManagedUpdater.exe")
+        staged_binary = os.path.join(cache_dir, dest_name)
+
+        req = urllib.request.Request(
+            download_url,
+            headers={"User-Agent": "Updraft-SelfUpdater"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            total_size = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            chunk_size = 64 * 1024
+            with open(staged_binary, "wb") as f:
+                while True:
+                    chunk = resp.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if progress_callback and total_size > 0:
+                        progress_callback(min(1.0, downloaded / total_size))
+
+        if dest_name.lower() == "managedupdater.exe":
+            staged_managed = staged_binary
+        else:
+            staged_simple = staged_binary
+
+    # 2. If managed or simple binary not directly found, try to extract from zip asset
+    if (not staged_managed or not staged_simple) and zip_asset and zip_asset.get("download_url"):
+        zip_path = os.path.join(cache_dir, zip_asset.get("name", "bundle.zip"))
+        req = urllib.request.Request(
+            zip_asset["download_url"],
+            headers={"User-Agent": "Updraft-SelfUpdater"}
+        )
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            total_size = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            chunk_size = 64 * 1024
+            with open(zip_path, "wb") as f:
+                while True:
+                    chunk = resp.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if progress_callback and total_size > 0:
+                        progress_callback(min(1.0, downloaded / total_size))
+
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for member in zf.namelist():
+                    m_lower = member.lower()
+                    if m_lower.endswith("managedupdater.exe") and not staged_managed:
+                        extracted = zf.extract(member, cache_dir)
+                        staged_managed = extracted
+                    elif m_lower.endswith("simpleupdater.exe") and not staged_simple:
+                        extracted = zf.extract(member, cache_dir)
+                        staged_simple = extracted
+        except Exception as e:
+            print(f"Warning: Failed to extract updaters from zip: {e}")
+
+    default_staged = staged_managed or staged_simple
+    if not default_staged:
         return {
             "updated_count": 0,
             "total": len(instances),
-            "errors": ["No ManagedUpdater.exe or SimpleUpdater.exe asset found in release"],
+            "errors": ["No updater binary or zip asset found in release."],
         }
-
-    download_url = target_asset["download_url"]
-    cache_dir = os.path.join(get_appdata_dir(), "temp_update")
-    os.makedirs(cache_dir, exist_ok=True)
-    staged_binary = os.path.join(cache_dir, target_asset.get("name", "ManagedUpdater.exe"))
-
-    # Download asset
-    req = urllib.request.Request(
-        download_url,
-        headers={"User-Agent": "Updraft-SelfUpdater"}
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        total_size = int(resp.headers.get("Content-Length", 0))
-        downloaded = 0
-        chunk_size = 64 * 1024
-        with open(staged_binary, "wb") as f:
-            while True:
-                chunk = resp.read(chunk_size)
-                if not chunk:
-                    break
-                f.write(chunk)
-                downloaded += len(chunk)
-                if progress_callback and total_size > 0:
-                    progress_callback(min(1.0, downloaded / total_size))
 
     if progress_callback:
         progress_callback(1.0)
 
-    # Distribute to each registered instance
+    # Distribute to each registered project instance
     updated_count = 0
     errors = []
     for proj_dir, meta in instances.items():
@@ -254,10 +300,13 @@ def update_all_managed_instances(
         if not updater_path:
             updater_path = os.path.join(proj_dir, "ManagedUpdater.exe")
 
+        is_standalone = os.path.basename(updater_path).lower() == "simpleupdater.exe"
+        chosen_binary = (staged_simple if is_standalone and staged_simple else None) or default_staged
+
         try:
             dest_dir = os.path.dirname(updater_path)
             if os.path.exists(dest_dir):
-                shutil.copy2(staged_binary, updater_path)
+                shutil.copy2(chosen_binary, updater_path)
                 updated_count += 1
         except Exception as e:
             errors.append(f"Failed to update {updater_path}: {e}")
@@ -266,6 +315,71 @@ def update_all_managed_instances(
         "updated_count": updated_count,
         "total": len(instances),
         "errors": errors,
-        "staged_binary": staged_binary,
+        "staged_binary": default_staged,
     }
+
+
+def check_and_update_project_updaters(
+    registry: Optional[Any] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
+    force: bool = False
+) -> Dict[str, Any]:
+    """
+    Checks for the latest release and updates all project updater executables
+    across all registered project folders.
+    If force is True, updates even if version tag matches current.
+    """
+    from core.config import ManagedRegistry
+    if registry is None:
+        registry = ManagedRegistry()
+
+    instances = registry.get_all_instances()
+    if not instances:
+        return {
+            "has_update": False,
+            "updated_count": 0,
+            "total": 0,
+            "message": "No managed project instances found."
+        }
+
+    repo_info = GitRepoInfo(APP_REPO_OWNER, APP_REPO_NAME, APP_REPO_URL)
+    client = GitHubClient(repo_info)
+    try:
+        rel = client.get_latest_release()
+        if not rel:
+            return {
+                "has_update": False,
+                "updated_count": 0,
+                "total": len(instances),
+                "error": "No releases found on GitHub."
+            }
+
+        remote_tag = rel.get("tag_name") or rel.get("name", "")
+        has_update = is_newer_version(remote_tag, APP_VERSION)
+        if not has_update and not force:
+            return {
+                "has_update": False,
+                "latest_version": remote_tag or APP_VERSION,
+                "current_version": APP_VERSION,
+                "updated_count": 0,
+                "total": len(instances)
+            }
+
+        assets = rel.get("assets", [])
+
+        def _prog(pct):
+            if progress_callback:
+                progress_callback(pct, f"Downloading updater components... {int(pct * 100)}%")
+
+        res = update_all_managed_instances(assets, registry=registry, progress_callback=_prog)
+        res["has_update"] = has_update
+        res["latest_version"] = remote_tag or APP_VERSION
+        return res
+    except Exception as e:
+        return {
+            "has_update": False,
+            "updated_count": 0,
+            "total": len(instances),
+            "error": str(e)
+        }
 

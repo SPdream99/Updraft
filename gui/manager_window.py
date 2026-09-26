@@ -64,9 +64,8 @@ class UpdateManagerWindow(tk.Tk):
         self._build_ui()
         self._refresh_list()
 
-        # Check for Updraft self-update if auto_update_self is enabled
-        if self.registry.get_global_settings().get("auto_update_self", True):
-            self.after(1500, lambda: self._on_update_app(silent=True))
+        # Check and auto-update project updaters and/or self on start
+        self.after(1500, self._on_startup_auto_check)
 
     def _build_ui(self):
         create_win7_header(
@@ -90,6 +89,9 @@ class UpdateManagerWindow(tk.Tk):
 
         self.btn_add = ttk.Button(toolbar, text="+ Add Existing Folder...", command=self._on_add_folder)
         self.btn_add.pack(side="left", padx=(0, 6))
+
+        self.btn_update_updaters = ttk.Button(toolbar, text="Update Project Updaters", command=self._on_update_project_updaters_manual)
+        self.btn_update_updaters.pack(side="left", padx=(0, 6))
 
         self.btn_update_app = ttk.Button(toolbar, text=f"Update Updraft ({APP_VERSION})", command=lambda: self._on_update_app(silent=False))
         self.btn_update_app.pack(side="left", padx=(0, 6))
@@ -279,6 +281,7 @@ class UpdateManagerWindow(tk.Tk):
             self.btn_update_all,
             self.btn_refresh,
             self.btn_add,
+            self.btn_update_updaters,
             self.btn_update_app,
             self.btn_global_settings,
         ):
@@ -476,19 +479,25 @@ class UpdateManagerWindow(tk.Tk):
                 self.run_script_after_update = s.get("run_script_after_update", False)
                 self.auto_update_on_startup = s.get("auto_update_on_startup", False)
                 self.auto_update_self = s.get("auto_update_self", True)
+                self.auto_update_project_updaters = s.get("auto_update_project_updaters", True)
                 self.create_shortcuts = s.get("create_shortcuts", True)
-                self.shortcut_folder_level = s.get("shortcut_folder_level", -1)
+                self.create_folder_shortcuts = s.get("create_folder_shortcuts", True)
+                self.shortcut_folder_level = s.get("shortcut_folder_level", 1)
+                self.shortcut_layout = s.get("shortcut_layout", "root")
                 self.project_name = "Global Settings"
 
             def save(self):
                 self.reg.save_global_settings(
-                    self.open_when_done,
-                    self.delete_compressed,
-                    self.run_script_after_update,
-                    self.auto_update_on_startup,
-                    self.auto_update_self,
-                    self.create_shortcuts,
-                    self.shortcut_folder_level
+                    open_when_done=self.open_when_done,
+                    delete_compressed=self.delete_compressed,
+                    run_script_after_update=self.run_script_after_update,
+                    auto_update_on_startup=self.auto_update_on_startup,
+                    auto_update_self=self.auto_update_self,
+                    create_shortcuts=self.create_shortcuts,
+                    shortcut_folder_level=self.shortcut_folder_level,
+                    create_folder_shortcuts=self.create_folder_shortcuts,
+                    shortcut_layout=self.shortcut_layout,
+                    auto_update_project_updaters=self.auto_update_project_updaters,
                 )
 
         mock = MockGlobalConfig(self.registry)
@@ -553,7 +562,7 @@ class UpdateManagerWindow(tk.Tk):
         if not path:
             return
 
-        self.lbl_status.config(text=f"Checking update for {os.path.basename(path)}...", foreground=ACCENT_BLUE)
+        self._set_busy(True, f"Checking update for {os.path.basename(path)}...")
 
         def worker():
             try:
@@ -575,23 +584,31 @@ class UpdateManagerWindow(tk.Tk):
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Check Error", f"Failed: {e}", parent=self))
             finally:
-                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+                self.after(0, lambda: self._set_busy(False, "Ready"))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_check_all(self):
-        self.lbl_status.config(text="Checking updates for all projects...", foreground=ACCENT_BLUE)
+        self._set_busy(True, "Checking updates for all projects...")
 
         def worker():
-            for path in list(self.instances.keys()):
-                if os.path.exists(path):
+            try:
+                all_paths = [p for p in self.instances.keys() if os.path.exists(p)]
+                total = len(all_paths)
+                for idx, path in enumerate(all_paths, start=1):
+                    p_name = os.path.basename(path)
+                    self.after(0, lambda i=idx, n=p_name: self.lbl_status.config(
+                        text=f"Checking [{i}/{total}] {n}...",
+                        foreground=ACCENT_BLUE
+                    ))
                     try:
                         res = self._check_project_update(path)
                         self.remote_status[path] = res
                     except Exception:
                         pass
-            self.after(0, self._refresh_list)
-            self.after(0, lambda: self.lbl_status.config(text="Finished checking all projects.", foreground=SUCCESS_GREEN))
+                self.after(0, self._refresh_list)
+            finally:
+                self.after(0, lambda: self._set_busy(False, "Finished checking all projects."))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -778,7 +795,7 @@ class UpdateManagerWindow(tk.Tk):
 
     def _on_update_app(self, silent: bool = False):
         if not silent:
-            self.lbl_status.config(text="Checking for Updraft updates...", foreground=ACCENT_BLUE)
+            self._set_busy(True, "Checking for Updraft updates...")
 
         def worker():
             try:
@@ -790,21 +807,15 @@ class UpdateManagerWindow(tk.Tk):
                     inst_count = len(self.registry.get_all_instances())
 
                     def prompt_and_update():
-                        if inst_count > 0:
-                            msg = (
-                                f"A new version of Updraft is available!\n\n"
-                                f"Current Version: {APP_VERSION}\n"
-                                f"Latest Version:  {latest}\n\n"
-                                f"This will update UpdateManager and all {inst_count} managed updater instance(s) across your projects.\n\n"
-                                f"Do you want to download and install this update now?"
-                            )
-                        else:
-                            msg = (
-                                f"A new version of Updraft is available!\n\n"
-                                f"Current Version: {APP_VERSION}\n"
-                                f"Latest Version:  {latest}\n\n"
-                                f"Do you want to download and install this update now?"
-                            )
+                        if not silent:
+                            self._set_busy(False)
+                        msg = (
+                            f"A new version of Updraft is available!\n\n"
+                            f"Current Version: {APP_VERSION}\n"
+                            f"Latest Version:  {latest}\n\n"
+                            f"This will update UpdateManager and all {inst_count} managed updater instance(s) across your projects.\n\n"
+                            f"Do you want to download and install this update now?"
+                        )
 
                         confirm = messagebox.askyesno("Updraft Update Available", msg, parent=self)
                         if confirm:
@@ -826,7 +837,9 @@ class UpdateManagerWindow(tk.Tk):
                 if not silent:
                     self.after(0, lambda: messagebox.showerror("Check Failed", f"Could not check for Updraft update: {e}", parent=self))
             finally:
-                if not self._is_busy:
+                if not silent:
+                    self.after(0, lambda: self._set_busy(False, "Ready"))
+                elif not self._is_busy:
                     self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -858,6 +871,80 @@ class UpdateManagerWindow(tk.Tk):
                 ))
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Self-Update Error", f"Failed to perform self-update:\n{e}", parent=self))
+            finally:
+                self.after(0, lambda: self._set_busy(False, "Ready"))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_startup_auto_check(self):
+        g_settings = self.registry.get_global_settings()
+        auto_updaters = g_settings.get("auto_update_project_updaters", True)
+        auto_self = g_settings.get("auto_update_self", True)
+
+        if not auto_updaters and not auto_self:
+            return
+
+        def worker():
+            try:
+                # 1. Auto-update project updaters on start if enabled
+                if auto_updaters and len(self.registry.get_all_instances()) > 0:
+                    from core.self_updater import check_and_update_project_updaters
+                    res = check_and_update_project_updaters(registry=self.registry, force=False)
+                    updated_cnt = res.get("updated_count", 0)
+                    if updated_cnt > 0:
+                        ver = res.get("latest_version", "")
+                        self.after(0, lambda: self.lbl_status.config(
+                            text=f"Auto-updated updaters in {updated_cnt} project folder(s) to {ver}.",
+                            foreground=SUCCESS_GREEN
+                        ))
+
+                # 2. Check for Updraft self update if enabled
+                if auto_self:
+                    self._on_update_app(silent=True)
+            except Exception as e:
+                print(f"Startup auto-check error: {e}")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_update_project_updaters_manual(self):
+        inst_count = len(self.registry.get_all_instances())
+        if inst_count == 0:
+            messagebox.showinfo("No Projects", "There are no managed project folders registered yet.", parent=self)
+            return
+
+        confirm = messagebox.askyesno(
+            "Update Project Updaters",
+            f"This will check for the latest updater release on GitHub and update the updater executables across all {inst_count} managed project folder(s).\n\n"
+            f"Do you want to proceed?",
+            parent=self
+        )
+        if not confirm:
+            return
+
+        self._set_busy(True, "Checking and updating project updaters...")
+
+        def worker():
+            try:
+                from core.self_updater import check_and_update_project_updaters
+                def prog(pct, txt):
+                    self.after(0, lambda: self._update_progress_bar(pct * 100, txt))
+
+                res = check_and_update_project_updaters(registry=self.registry, progress_callback=prog, force=True)
+                updated_cnt = res.get("updated_count", 0)
+                total = res.get("total", inst_count)
+                errs = res.get("errors", [])
+
+                if errs and updated_cnt == 0:
+                    err_text = "\n".join(errs[:5])
+                    self.after(0, lambda: messagebox.showerror("Update Error", f"Failed to update project updaters:\n{err_text}", parent=self))
+                else:
+                    msg = f"Successfully updated updater executables in {updated_cnt}/{total} project folder(s)!"
+                    if errs:
+                        msg += f"\n\nWarnings:\n" + "\n".join(errs[:3])
+                    self.after(0, lambda: messagebox.showinfo("Updaters Updated", msg, parent=self))
+                    self.after(0, self._refresh_list)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Update Error", f"Failed to update project updaters:\n{e}", parent=self))
             finally:
                 self.after(0, lambda: self._set_busy(False, "Ready"))
 

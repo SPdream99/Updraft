@@ -88,6 +88,7 @@ class TestManagerBusyState(unittest.TestCase):
             self.assertEqual(str(app.btn_update_all["state"]), "disabled")
             self.assertEqual(str(app.btn_refresh["state"]), "disabled")
             self.assertEqual(str(app.btn_add["state"]), "disabled")
+            self.assertEqual(str(app.btn_update_updaters["state"]), "disabled")
             self.assertEqual(str(app.btn_update_app["state"]), "disabled")
             self.assertEqual(str(app.btn_global_settings["state"]), "disabled")
             self.assertEqual(str(app.btn_check_sel["state"]), "disabled")
@@ -104,10 +105,24 @@ class TestManagerBusyState(unittest.TestCase):
             self.assertEqual(str(app.btn_update_all["state"]), "normal")
             self.assertEqual(str(app.btn_refresh["state"]), "normal")
             self.assertEqual(str(app.btn_add["state"]), "normal")
+            self.assertEqual(str(app.btn_update_updaters["state"]), "normal")
             self.assertEqual(str(app.btn_update_app["state"]), "normal")
             self.assertEqual(str(app.btn_global_settings["state"]), "normal")
         finally:
             app.destroy()
+
+    def test_global_settings_auto_update_project_updaters(self):
+        from core.config import ManagedRegistry
+        reg = ManagedRegistry()
+        settings = reg.get_global_settings()
+        self.assertIn("auto_update_project_updaters", settings)
+
+    def test_check_and_update_project_updaters_function(self):
+        from core.self_updater import check_and_update_project_updaters
+        # Running with empty/current registry should return cleanly without uncaught exception
+        res = check_and_update_project_updaters(force=False)
+        self.assertIsInstance(res, dict)
+        self.assertIn("updated_count", res)
 
 
 if __name__ == "__main__":

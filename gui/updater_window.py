@@ -205,11 +205,12 @@ class UpdaterMainWindow(tk.Tk):
 
     # --- Button Actions ---
     def _on_check_update(self):
-        self.btn_check_update.config(state="disabled")
+        self._set_buttons_state("disabled")
         self.lbl_status.config(text="Checking for updates...", foreground=ACCENT_BLUE)
         self.progress_bar["value"] = 0
 
         def check_thread():
+            is_update_available = False
             try:
                 repo_info = parse_git_url(self.config.git_url)
                 if not repo_info:
@@ -217,7 +218,6 @@ class UpdaterMainWindow(tk.Tk):
                     return
 
                 client = GitHubClient(repo_info)
-                is_update_available = False
                 remote_version_name = ""
                 remote_version_date = ""
                 remote_download_urls: List[tuple] = []
@@ -264,7 +264,8 @@ class UpdaterMainWindow(tk.Tk):
             except Exception as e:
                 self.after(0, lambda err=str(e): self._show_check_error(err))
             finally:
-                self.after(0, lambda: self.btn_check_update.config(state="normal"))
+                if not is_update_available:
+                    self.after(0, lambda: self._set_buttons_state("normal"))
 
         threading.Thread(target=check_thread, daemon=True).start()
 
@@ -302,6 +303,7 @@ class UpdaterMainWindow(tk.Tk):
         confirm = messagebox.askyesno("Update Available", msg, parent=self)
         if not confirm:
             self.lbl_status.config(text="Update cancelled by user.", foreground=MUTED_TEXT)
+            self._set_buttons_state("normal")
             return
 
         # If release update has unresolved assets or no matches found while assets exist:
@@ -314,6 +316,7 @@ class UpdaterMainWindow(tk.Tk):
                     self._start_download_and_install(new_version_name, new_version_date, chosen_urls)
 
                 preselected = [a["name"] for a in (matched_assets or [])]
+                self._set_buttons_state("normal")
                 AssetPickerDialog(
                     self,
                     project_name=self.config.project_name,
@@ -417,7 +420,9 @@ class UpdaterMainWindow(tk.Tk):
 
     def _on_update_self(self, silent: bool = False):
         bin_name = os.path.basename(self.updater_exe_path)
-        self.lbl_status.config(text="Checking for Updraft updates...", foreground=ACCENT_BLUE)
+        if not silent:
+            self._set_buttons_state("disabled")
+            self.lbl_status.config(text="Checking for Updraft updates...", foreground=ACCENT_BLUE)
 
         def worker():
             try:
@@ -427,6 +432,8 @@ class UpdaterMainWindow(tk.Tk):
                     url = res.get("asset_url")
 
                     def prompt_and_update():
+                        if not silent:
+                            self._set_buttons_state("normal")
                         confirm = messagebox.askyesno(
                             "Updraft Update Available",
                             f"A new version of Updraft is available!\n\n"
@@ -454,7 +461,10 @@ class UpdaterMainWindow(tk.Tk):
                 if not silent:
                     self.after(0, lambda: messagebox.showerror("Check Failed", f"Could not check for Updraft update: {e}", parent=self))
             finally:
-                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+                if not silent:
+                    self.after(0, lambda: self._set_buttons_state("normal"))
+                elif not self.is_updating:
+                    self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
 
         threading.Thread(target=worker, daemon=True).start()
 
