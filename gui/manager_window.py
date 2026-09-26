@@ -52,6 +52,8 @@ class UpdateManagerWindow(tk.Tk):
 
         self.instances: Dict[str, Dict[str, Any]] = {}
         self.remote_status: Dict[str, Dict[str, Any]] = {}
+        self._is_busy = False
+        self.protocol("WM_DELETE_WINDOW", self._on_close_window)
 
         if getattr(sys, "frozen", False):
             self.updater_exe_path = os.path.abspath(sys.executable)
@@ -77,23 +79,23 @@ class UpdateManagerWindow(tk.Tk):
         toolbar = ttk.Frame(self, padding=(12, 8))
         toolbar.pack(fill="x")
 
-        btn_check_all = ttk.Button(toolbar, text="Check All Updates", command=self._on_check_all)
-        btn_check_all.pack(side="left", padx=(0, 6))
+        self.btn_check_all = ttk.Button(toolbar, text="Check All Updates", command=self._on_check_all)
+        self.btn_check_all.pack(side="left", padx=(0, 6))
 
-        btn_update_all = ttk.Button(toolbar, text="Update All", style="Accent.TButton", command=self._on_update_all)
-        btn_update_all.pack(side="left", padx=(0, 6))
+        self.btn_update_all = ttk.Button(toolbar, text="Update All", style="Accent.TButton", command=self._on_update_all)
+        self.btn_update_all.pack(side="left", padx=(0, 6))
 
-        btn_refresh = ttk.Button(toolbar, text="Refresh List", command=self._refresh_list)
-        btn_refresh.pack(side="left", padx=(0, 6))
+        self.btn_refresh = ttk.Button(toolbar, text="Refresh List", command=self._refresh_list)
+        self.btn_refresh.pack(side="left", padx=(0, 6))
 
-        btn_add = ttk.Button(toolbar, text="+ Add Existing Folder...", command=self._on_add_folder)
-        btn_add.pack(side="left", padx=(0, 6))
+        self.btn_add = ttk.Button(toolbar, text="+ Add Existing Folder...", command=self._on_add_folder)
+        self.btn_add.pack(side="left", padx=(0, 6))
 
-        btn_update_app = ttk.Button(toolbar, text=f"Update Updraft ({APP_VERSION})", command=lambda: self._on_update_app(silent=False))
-        btn_update_app.pack(side="left", padx=(0, 6))
+        self.btn_update_app = ttk.Button(toolbar, text=f"Update Updraft ({APP_VERSION})", command=lambda: self._on_update_app(silent=False))
+        self.btn_update_app.pack(side="left", padx=(0, 6))
 
-        btn_global_settings = ttk.Button(toolbar, text="Global Settings", command=self._on_global_settings)
-        btn_global_settings.pack(side="right")
+        self.btn_global_settings = ttk.Button(toolbar, text="Global Settings", command=self._on_global_settings)
+        self.btn_global_settings.pack(side="right")
 
         from core.startup import is_startup_enabled
         startup_active = is_startup_enabled()
@@ -120,6 +122,8 @@ class UpdateManagerWindow(tk.Tk):
 
         self.lbl_count = ttk.Label(status_bar, text="0 instances managed", font=("Segoe UI", 8), foreground=MUTED_TEXT)
         self.lbl_count.pack(side="right")
+
+        self.progress_bar = ttk.Progressbar(status_bar, orient="horizontal", mode="determinate", length=220)
 
         # Selected Project Actions Panel (docked right above status bar)
         action_box = ttk.LabelFrame(self, text="Selected Project Actions", padding=(12, 8))
@@ -239,11 +243,103 @@ class UpdateManagerWindow(tk.Tk):
             )
         self._on_select_item(None)
 
+    def _block_event(self, event):
+        return "break"
+
+    def _on_close_window(self):
+        if self._is_busy:
+            messagebox.showwarning(
+                "Update in Progress",
+                "An update operation is currently in progress.\nPlease wait until it completes before closing.",
+                parent=self
+            )
+            return
+        self.destroy()
+
+    def _update_progress_bar(self, pct: float, text: str = ""):
+        if self.progress_bar["mode"] != "determinate":
+            self.progress_bar.stop()
+            self.progress_bar.config(mode="determinate")
+        self.progress_bar.config(value=pct)
+        if text:
+            self.lbl_status.config(text=text, foreground=ACCENT_BLUE)
+
+    def _set_indeterminate_progress(self, text: str = ""):
+        self.progress_bar.config(mode="indeterminate")
+        self.progress_bar.start(10)
+        if text:
+            self.lbl_status.config(text=text, foreground=ACCENT_BLUE)
+
+    def _set_busy(self, is_busy: bool, status_text: str = ""):
+        self._is_busy = is_busy
+        state = "disabled" if is_busy else "normal"
+
+        for btn in (
+            self.btn_check_all,
+            self.btn_update_all,
+            self.btn_refresh,
+            self.btn_add,
+            self.btn_update_app,
+            self.btn_global_settings,
+        ):
+            try:
+                btn.config(state=state)
+            except Exception:
+                pass
+
+        if is_busy:
+            for btn in (
+                self.btn_check_sel,
+                self.btn_update_sel,
+                self.btn_exclude_sel,
+                self.btn_settings_sel,
+                self.btn_run_script_sel,
+                self.btn_shortcuts_sel,
+                self.btn_open_folder,
+                self.btn_remove_sel,
+            ):
+                try:
+                    btn.config(state="disabled")
+                except Exception:
+                    pass
+
+            self.tree.bind("<Button-1>", self._block_event)
+            self.tree.bind("<Double-1>", self._block_event)
+            self.tree.bind("<Key>", self._block_event)
+            self.tree.bind("<ButtonRelease-1>", self._block_event)
+            try:
+                self.config(cursor="wait")
+            except Exception:
+                pass
+            self.progress_bar.pack(side="right", padx=(0, 14))
+        else:
+            self.tree.unbind("<Button-1>")
+            self.tree.bind("<Double-1>", lambda e: self._on_open_folder())
+            self.tree.unbind("<Key>")
+            self.tree.unbind("<ButtonRelease-1>")
+            try:
+                self.config(cursor="")
+            except Exception:
+                pass
+            try:
+                self.progress_bar.stop()
+            except Exception:
+                pass
+            self.progress_bar.pack_forget()
+            self.progress_bar.config(value=0, mode="determinate")
+            self._on_select_item(None)
+
+        if status_text:
+            self.lbl_status.config(text=status_text, foreground=ACCENT_BLUE if is_busy else MUTED_TEXT)
+
     def _get_selected_path(self) -> Optional[str]:
         sel = self.tree.selection()
         return sel[0] if sel else None
 
     def _on_select_item(self, event):
+        if self._is_busy:
+            return
+
         path = self._get_selected_path()
         has_sel = path is not None and os.path.exists(path)
         state = "normal" if has_sel else "disabled"
@@ -546,7 +642,8 @@ class UpdateManagerWindow(tk.Tk):
         self._perform_update_for_path(path, rem)
 
     def _perform_update_for_path(self, path: str, rem: Dict[str, Any]):
-        self.lbl_status.config(text=f"Updating {os.path.basename(path)}...", foreground=ACCENT_BLUE)
+        p_name = os.path.basename(path)
+        self._set_busy(True, f"Updating {p_name}...")
 
         def worker():
             try:
@@ -554,11 +651,22 @@ class UpdateManagerWindow(tk.Tk):
                 config = rem["config"]
                 downloaded = []
 
+                def dl_prog(downloaded_bytes, total_bytes, fname):
+                    if total_bytes > 0:
+                        pct = (downloaded_bytes / total_bytes) * 100
+                        self.after(0, lambda: self._update_progress_bar(pct, f"Downloading {fname}... {int(pct)}%"))
+
                 for url, fname in rem["download_urls"]:
-                    p = engine.download_file(url, fname)
+                    self.after(0, lambda fn=fname: self.lbl_status.config(text=f"Downloading {fn}...", foreground=ACCENT_BLUE))
+                    p = engine.download_file(url, fname, progress_callback=dl_prog)
                     downloaded.append(p)
 
-                engine.install_or_update(downloaded, is_update=True)
+                self.after(0, lambda: self._set_indeterminate_progress("Installing files & preserving excluded files..."))
+                engine.install_or_update(
+                    downloaded,
+                    is_update=True,
+                    progress_callback=lambda m: self.after(0, lambda msg=m: self.lbl_status.config(text=msg, foreground=ACCENT_BLUE))
+                )
 
                 config.version_name = rem["latest_version"]
                 config.version_date = rem["latest_date"]
@@ -589,7 +697,7 @@ class UpdateManagerWindow(tk.Tk):
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Update Error", f"Failed to update {os.path.basename(path)}:\n{e}", parent=self))
             finally:
-                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+                self.after(0, lambda: self._set_busy(False, "Ready"))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -607,50 +715,64 @@ class UpdateManagerWindow(tk.Tk):
         if not confirm:
             return
 
-        self.lbl_status.config(text="Updating all projects...", foreground=ACCENT_BLUE)
+        total_projects = len(available_updates)
+        self._set_busy(True, f"Starting batch update for {total_projects} project(s)...")
 
         def worker():
             successes = 0
-            for path in available_updates:
-                rem = self.remote_status.get(path)
-                if not rem:
-                    continue
-                try:
-                    engine = UpdateEngine(path)
-                    config = rem["config"]
-                    downloaded = []
+            try:
+                for idx, path in enumerate(available_updates, start=1):
+                    rem = self.remote_status.get(path)
+                    if not rem:
+                        continue
+                    try:
+                        p_name = os.path.basename(path)
+                        self.after(0, lambda i=idx, n=p_name: self.lbl_status.config(
+                            text=f"Updating [{i}/{total_projects}] {n}...",
+                            foreground=ACCENT_BLUE
+                        ))
+                        engine = UpdateEngine(path)
+                        config = rem["config"]
+                        downloaded = []
 
-                    for url, fname in rem["download_urls"]:
-                        p = engine.download_file(url, fname)
-                        downloaded.append(p)
+                        def dl_prog(downloaded_bytes, total_bytes, fname, i=idx):
+                            if total_bytes > 0:
+                                pct = (downloaded_bytes / total_bytes) * 100
+                                self.after(0, lambda: self._update_progress_bar(pct, f"[{i}/{total_projects}] Downloading {fname}... {int(pct)}%"))
 
-                    engine.install_or_update(downloaded, is_update=True)
+                        for url, fname in rem["download_urls"]:
+                            p = engine.download_file(url, fname, progress_callback=dl_prog)
+                            downloaded.append(p)
 
-                    config.version_name = rem["latest_version"]
-                    config.version_date = rem["latest_date"]
-                    config.save()
+                        self.after(0, lambda i=idx, n=p_name: self._set_indeterminate_progress(f"[{i}/{total_projects}] Installing {n}..."))
+                        engine.install_or_update(downloaded, is_update=True)
 
-                    self.registry.register_instance(
-                        project_dir=path,
-                        updater_path=os.path.join(path, "ManagedUpdater.exe"),
-                        project_name=config.project_name,
-                        git_url=config.git_url,
-                        version_name=config.version_name,
-                        version_date=config.version_date,
-                        update_type=config.update_type
-                    )
+                        config.version_name = rem["latest_version"]
+                        config.version_date = rem["latest_date"]
+                        config.save()
 
-                    rem["has_update"] = False
-                    successes += 1
+                        self.registry.register_instance(
+                            project_dir=path,
+                            updater_path=os.path.join(path, "ManagedUpdater.exe"),
+                            project_name=config.project_name,
+                            git_url=config.git_url,
+                            version_name=config.version_name,
+                            version_date=config.version_date,
+                            update_type=config.update_type
+                        )
 
-                    if config.run_script_after_update:
-                        run_done_script(path)
-                except Exception as e:
-                    print(f"Error updating {path}: {e}")
+                        rem["has_update"] = False
+                        successes += 1
 
-            self.after(0, self._refresh_list)
-            self.after(0, lambda: messagebox.showinfo("Update All", f"Completed updating {successes} project(s)!", parent=self))
-            self.after(0, lambda: self.lbl_status.config(text="Finished batch update.", foreground=SUCCESS_GREEN))
+                        if config.run_script_after_update:
+                            run_done_script(path)
+                    except Exception as e:
+                        print(f"Error updating {path}: {e}")
+
+                self.after(0, self._refresh_list)
+                self.after(0, lambda: messagebox.showinfo("Update All", f"Completed updating {successes}/{total_projects} project(s)!", parent=self))
+            finally:
+                self.after(0, lambda: self._set_busy(False, "Finished batch update."))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -704,12 +826,13 @@ class UpdateManagerWindow(tk.Tk):
                 if not silent:
                     self.after(0, lambda: messagebox.showerror("Check Failed", f"Could not check for Updraft update: {e}", parent=self))
             finally:
-                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+                if not self._is_busy:
+                    self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _start_app_update(self, all_assets: list, manager_url: str, latest_version: str):
-        self.lbl_status.config(text="Updating Updraft suite...", foreground=ACCENT_BLUE)
+        self._set_busy(True, "Updating Updraft suite...")
 
         def worker():
             try:
@@ -723,7 +846,7 @@ class UpdateManagerWindow(tk.Tk):
 
                 # 2. Download and self-update UpdateManager.exe
                 def prog(pct):
-                    self.after(0, lambda: self.lbl_status.config(text=f"Downloading UpdateManager.exe... {int(pct * 100)}%", foreground=ACCENT_BLUE))
+                    self.after(0, lambda: self._update_progress_bar(pct * 100, f"Downloading UpdateManager.exe... {int(pct * 100)}%"))
 
                 perform_app_self_update(manager_url, self.updater_exe_path, progress_callback=prog, restart=True)
 
@@ -733,9 +856,9 @@ class UpdateManagerWindow(tk.Tk):
                     f"Updraft update complete!\n\nUpdated {updated_inst} managed project instance(s) and staged {latest_version}.",
                     parent=self
                 ))
-                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Self-Update Error", f"Failed to perform self-update:\n{e}", parent=self))
-                self.after(0, lambda: self.lbl_status.config(text="Ready", foreground=MUTED_TEXT))
+            finally:
+                self.after(0, lambda: self._set_busy(False, "Ready"))
 
         threading.Thread(target=worker, daemon=True).start()

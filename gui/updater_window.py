@@ -58,6 +58,9 @@ class UpdaterMainWindow(tk.Tk):
         self.minsize(500, 560)
         self.resizable(False, False)
 
+        self.is_updating = False
+        self.protocol("WM_DELETE_WINDOW", self._on_close_window)
+
         apply_win7_theme(self)
 
         # Center window
@@ -187,7 +190,7 @@ class UpdaterMainWindow(tk.Tk):
             btn_group,
             text="Close",
             style="Large.TButton",
-            command=self.destroy
+            command=self._on_close_window
         )
         self.btn_close.pack(fill="x", pady=4, ipady=3)
 
@@ -388,7 +391,22 @@ class UpdaterMainWindow(tk.Tk):
 
         threading.Thread(target=update_worker, daemon=True).start()
 
+    def _on_close_window(self):
+        if getattr(self, "is_updating", False):
+            messagebox.showwarning(
+                "Update in Progress",
+                "An update operation is currently in progress.\nPlease wait until it completes before closing.",
+                parent=self
+            )
+            return
+        self.destroy()
+
     def _set_buttons_state(self, state: str):
+        self.is_updating = (state == "disabled")
+        try:
+            self.config(cursor="wait" if self.is_updating else "")
+        except Exception:
+            pass
         self.btn_check_update.config(state=state)
         self.btn_exclude_file.config(state=state)
         self.btn_settings.config(state=state)

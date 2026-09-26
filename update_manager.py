@@ -20,9 +20,17 @@ def main():
         run_startup_update_all()
         sys.exit(0)
 
+    from core.single_instance import SingleInstanceLock
+    lock = SingleInstanceLock("updraft_update_manager", window_title_hint="Update Manager")
+    if not lock.acquire():
+        sys.exit(0)
+
     from gui.manager_window import UpdateManagerWindow
     app = UpdateManagerWindow()
-    app.mainloop()
+    try:
+        app.mainloop()
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":

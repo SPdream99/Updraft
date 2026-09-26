@@ -36,8 +36,16 @@ class TestBuiltBinaries(unittest.TestCase):
                 out, err = proc.communicate()
                 self.fail(f"{exe_name} crashed immediately with return code {poll}. Stderr: {err.decode('utf-8', errors='ignore')}")
             # Process is running cleanly! Terminate it.
-            proc.terminate()
-            proc.wait(timeout=5)
+            import sys
+            if sys.platform == "win32":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                pass
+            time.sleep(1)
 
 if __name__ == "__main__":
     unittest.main()

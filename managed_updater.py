@@ -39,29 +39,39 @@ def main():
             run_silent_single_update(app_dir)
         sys.exit(0)
 
-    # Managed check:
-    # "An instance of this app, if managed type and there are no info data for the current
-    # location of this instance store in the same folder in appdata and updater-info.ini
-    # of this project in the current folder then proceed to install phase."
-    has_appdata_info = registry.has_instance(app_dir)
-    has_ini_file = config.exists()
+    from core.single_instance import SingleInstanceLock
+    lock_key = f"updraft_managed_{os.path.normcase(os.path.abspath(app_dir))}"
+    title_hint = config.project_name or "Managed Updater"
+    lock = SingleInstanceLock(lock_key, window_title_hint=title_hint)
+    if not lock.acquire():
+        sys.exit(0)
 
-    if not has_appdata_info or not has_ini_file:
-        def on_installed(target_project_dir: str):
-            target_exe = os.path.join(target_project_dir, os.path.basename(exe_path))
-            app = UpdaterMainWindow(target_project_dir, target_exe, is_managed=True)
+    try:
+        # Managed check:
+        # "An instance of this app, if managed type and there are no info data for the current
+        # location of this instance store in the same folder in appdata and updater-info.ini
+        # of this project in the current folder then proceed to install phase."
+        has_appdata_info = registry.has_instance(app_dir)
+        has_ini_file = config.exists()
+
+        if not has_appdata_info or not has_ini_file:
+            def on_installed(target_project_dir: str):
+                target_exe = os.path.join(target_project_dir, os.path.basename(exe_path))
+                app = UpdaterMainWindow(target_project_dir, target_exe, is_managed=True)
+                app.mainloop()
+
+            wizard = InstallWizard(
+                current_dir=app_dir,
+                updater_exe_path=exe_path,
+                is_managed=True,
+                on_install_complete=on_installed
+            )
+            wizard.mainloop()
+        else:
+            app = UpdaterMainWindow(app_dir, exe_path, is_managed=True)
             app.mainloop()
-
-        wizard = InstallWizard(
-            current_dir=app_dir,
-            updater_exe_path=exe_path,
-            is_managed=True,
-            on_install_complete=on_installed
-        )
-        wizard.mainloop()
-    else:
-        app = UpdaterMainWindow(app_dir, exe_path, is_managed=True)
-        app.mainloop()
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":

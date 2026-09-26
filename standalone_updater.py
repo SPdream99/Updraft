@@ -36,24 +36,34 @@ def main():
             run_silent_single_update(app_dir)
         sys.exit(0)
 
-    # Standalone check: If there is no updater-info.ini in the same folder, proceed to install phase
-    if not config.exists():
-        def on_installed(target_project_dir: str):
-            # After installation, open the main updater dashboard in the new project directory
-            target_exe = os.path.join(target_project_dir, os.path.basename(exe_path))
-            app = UpdaterMainWindow(target_project_dir, target_exe, is_managed=False)
-            app.mainloop()
+    from core.single_instance import SingleInstanceLock
+    lock_key = f"updraft_standalone_{os.path.normcase(os.path.abspath(app_dir))}"
+    title_hint = config.project_name or "Simple Updater"
+    lock = SingleInstanceLock(lock_key, window_title_hint=title_hint)
+    if not lock.acquire():
+        sys.exit(0)
 
-        wizard = InstallWizard(
-            current_dir=app_dir,
-            updater_exe_path=exe_path,
-            is_managed=False,
-            on_install_complete=on_installed
-        )
-        wizard.mainloop()
-    else:
-        app = UpdaterMainWindow(app_dir, exe_path, is_managed=False)
-        app.mainloop()
+    try:
+        # Standalone check: If there is no updater-info.ini in the same folder, proceed to install phase
+        if not config.exists():
+            def on_installed(target_project_dir: str):
+                # After installation, open the main updater dashboard in the new project directory
+                target_exe = os.path.join(target_project_dir, os.path.basename(exe_path))
+                app = UpdaterMainWindow(target_project_dir, target_exe, is_managed=False)
+                app.mainloop()
+
+            wizard = InstallWizard(
+                current_dir=app_dir,
+                updater_exe_path=exe_path,
+                is_managed=False,
+                on_install_complete=on_installed
+            )
+            wizard.mainloop()
+        else:
+            app = UpdaterMainWindow(app_dir, exe_path, is_managed=False)
+            app.mainloop()
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":

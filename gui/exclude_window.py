@@ -132,8 +132,8 @@ class ExcludeFilesDialog(tk.Toplevel):
         self.engine = UpdateEngine(self.project_dir)
 
         self.title(f"Exclude Files from Updates - {config.project_name or 'Simple Updater'}")
-        self.geometry("900x600")
-        self.minsize(780, 500)
+        self.geometry("960x620")
+        self.minsize(820, 520)
         self.transient(parent)
         self.grab_set()
 
@@ -323,7 +323,7 @@ class ExcludeFilesDialog(tk.Toplevel):
 
         self.tree = ttk.Treeview(
             tree_container,
-            columns=("folder", "status", "size"),
+            columns=("status", "size", "folder"),
             selectmode="browse",
             yscrollcommand=tree_scroll_y.set,
             xscrollcommand=tree_scroll_x.set,
@@ -451,14 +451,14 @@ class ExcludeFilesDialog(tk.Toplevel):
             return ""
 
         self.tree.heading("#0", text=f"File Name{arrow('name')}", anchor="w", command=lambda: self._on_header_click("name"))
-        self.tree.heading("folder", text=f"Folder{arrow('folder')}", anchor="w", command=lambda: self._on_header_click("folder"))
         self.tree.heading("status", text=f"Excluded?{arrow('status')}", anchor="center", command=lambda: self._on_header_click("status"))
         self.tree.heading("size", text=f"Size{arrow('size')}", anchor="e", command=lambda: self._on_header_click("size"))
+        self.tree.heading("folder", text=f"Folder{arrow('folder')}", anchor="w", command=lambda: self._on_header_click("folder"))
 
-        self.tree.column("#0", width=220, stretch=True)
-        self.tree.column("folder", width=140, stretch=True)
-        self.tree.column("status", width=95, anchor="center", stretch=False)
-        self.tree.column("size", width=70, anchor="e", stretch=False)
+        self.tree.column("#0", width=260, minwidth=180, stretch=True)
+        self.tree.column("status", width=125, minwidth=115, anchor="center", stretch=False)
+        self.tree.column("size", width=80, minwidth=70, anchor="e", stretch=False)
+        self.tree.column("folder", width=160, minwidth=120, stretch=True)
 
     def _on_header_click(self, col: str):
         """Toggle sort order when a column header is clicked."""
@@ -538,7 +538,7 @@ class ExcludeFilesDialog(tk.Toplevel):
         if is_hierarchical:
             self.tree.config(displaycolumns=("status", "size"))
         else:
-            self.tree.config(displaycolumns=("folder", "status", "size"))
+            self.tree.config(displaycolumns=("status", "size", "folder"))
 
         if not is_hierarchical:
             # Flat list view
@@ -551,7 +551,7 @@ class ExcludeFilesDialog(tk.Toplevel):
                     "",
                     "end",
                     text=f"📄 {f['name']}",
-                    values=(f["rel_dir"], check_icon, f["size_str"])
+                    values=(check_icon, f["size_str"], f["rel_dir"])
                 )
                 self.item_meta[item_id] = {
                     "rel_path": rel_path,
@@ -592,7 +592,7 @@ class ExcludeFilesDialog(tk.Toplevel):
                                 parent_tree_id,
                                 "end",
                                 text=f"📁 {entry.name}",
-                                values=("", ""),
+                                values=("", "", ""),
                                 open=should_open
                             )
                             self.item_meta[dir_id] = {
@@ -615,7 +615,7 @@ class ExcludeFilesDialog(tk.Toplevel):
                         parent_tree_id,
                         "end",
                         text=f"📄 {f['name']}",
-                        values=(check_icon, f["size_str"])
+                        values=(check_icon, f["size_str"], "")
                     )
                     self.item_meta[item_id] = {
                         "rel_path": rel_path,
